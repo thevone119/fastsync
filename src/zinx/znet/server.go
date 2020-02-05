@@ -169,15 +169,11 @@ func (s *Server) CallOnConnStop(conn ziface.IConnection) {
 }
 
 func init() {
-	zlog.Debug(zinx_logo)
-	zlog.Debug(top_line)
-	zlog.Debug(fmt.Sprintf("%s [Github] https://github.com/aceld                 %s", border_line, border_line))
-	zlog.Debug(fmt.Sprintf("%s [tutorial] https://www.jianshu.com/p/23d07c0a28e5 %s", border_line, border_line))
-	zlog.Debug(bottom_line)
-	zlog.Debugf("[Zinx] Version: %s, MaxConn: %d, MaxPacketSize: %d\n",
-		utils.GlobalObject.Version,
-		utils.GlobalObject.MaxConn,
-		utils.GlobalObject.MaxPacketSize)
+	//zlog.Debug(top_line)
+	//zlog.Debug(fmt.Sprintf("%s [Github] https://github.com/aceld                 %s", border_line, border_line))
+	//zlog.Debug(fmt.Sprintf("%s [tutorial] https://www.jianshu.com/p/23d07c0a28e5 %s", border_line, border_line))
+	//zlog.Debug(bottom_line)
+	//zlog.Debugf("[Zinx] Version: %s, MaxConn: %d, MaxPacketSize: %d\n", utils.GlobalObject.Version, utils.GlobalObject.MaxConn, utils.GlobalObject.MaxPacketSize)
 }
 
 

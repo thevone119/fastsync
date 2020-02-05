@@ -20,7 +20,7 @@ func TestTempMap(t *testing.T) {
 			fmt.Println("value:",v)
 		}
 		currtime := time.Now().UnixNano() / 1e6
-		mdb,err:=utils.GetFileMd5("d:/test22.rar",1)
+		mdb,err:=utils.GetFileMd5("/test/UnityPlayer.dll",1)
 		fmt.Println("md5 usetime :",time.Now().UnixNano() / 1e6-currtime)
 
 		if err!=nil{

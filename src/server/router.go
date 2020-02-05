@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"comm"
+	"fmt"
 	"sync"
 	"time"
 	"utils"
@@ -20,7 +21,7 @@ type KeepAliveRouter struct {
 }
 //Ping Handle
 func (this *KeepAliveRouter) Handle(request ziface.IRequest) {
-	zlog.Info("KeepAlive..." ,request.GetConnection().RemoteAddr())
+	zlog.Debug("KeepAlive..." ,request.GetConnection().RemoteAddr())
 	//
 	err := request.GetConnection().SendBuffMsg(comm.NewKeepAliveMsg(time.Now().Unix()).GetMsg())
 	if err != nil {
@@ -66,23 +67,30 @@ type CheckFileRouter struct {
 
 //Ping Handle
 func (this *CheckFileRouter) Handle(request ziface.IRequest) {
-	zlog.Info("CheckFile..." )
+	zlog.Debug("CheckFile..." )
+
 	CheckFileMutex.Lock()
 	//校验文件
 	ckcekf:=comm.NewCheckFileMsgByByte(request.GetData())
 	_,ok:=comm.TempMap.Get(ckcekf.Filepaht)
 	if ok{
 		request.GetConnection().SendBuffMsg(comm.NewCheckFileRetMsg(ckcekf.Filepaht,3).GetMsg())
+		zlog.Debug("CheckFile is lock by other", ckcekf.Filepaht)
+		CheckFileMutex.Unlock()
 		return
 	}else{
 		//锁1分钟
 		comm.TempMap.Put(ckcekf.Filepaht,"",60)
 	}
 	CheckFileMutex.Unlock()
-	fp :=comm.AppendPath(comm.SyncConfigObj.BasePath,ckcekf.Filepaht)
+
+
+	//fp :=comm.AppendPath(comm.SyncConfigObj.BasePath,ckcekf.Filepaht)
+	fp :=comm.AppendPath("/test2",ckcekf.Filepaht)
 	//如果文件不存在,则上传文件
 	if hasf,_:=comm.PathExists(fp);hasf==false{
 		request.GetConnection().SendBuffMsg(comm.NewCheckFileRetMsg(ckcekf.Filepaht,1).GetMsg())
+		zlog.Info("file not found", ckcekf.Filepaht)
 		return
 	}else{
 		//存在，则校验MD5
@@ -92,8 +100,12 @@ func (this *CheckFileRouter) Handle(request ziface.IRequest) {
 			return
 		}
 		if bytes.Equal(md5,ckcekf.Check){
+			zlog.Info("check file same", ckcekf.Filepaht)
 			request.GetConnection().SendBuffMsg(comm.NewCheckFileRetMsg(ckcekf.Filepaht,2).GetMsg())
 		}else{
+			zlog.Debug("old md5:", fmt.Sprintf("%x",ckcekf.Check))
+			zlog.Debug("new md5:", fmt.Sprintf("%x",md5))
+			zlog.Info("check file is different", ckcekf.Filepaht)
 			request.GetConnection().SendBuffMsg(comm.NewCheckFileRetMsg(ckcekf.Filepaht,1).GetMsg())
 		}
 	}

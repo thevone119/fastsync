@@ -198,8 +198,9 @@ func (n *NetWork) doReceiveData(msg ziface.IMessage){
 			}
 		}
 	}
-
 }
+
+
 
 
 

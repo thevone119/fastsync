@@ -22,7 +22,7 @@ var SyncConfigObj *SyncConfig
 func init() {
 	//初始化GlobalObject变量，设置一些默认值
 	SyncConfigObj = &SyncConfig{
-		BasePath:             "ZinxServerApp",
+		BasePath:             "/test",
 		ConfFilePath:"conf/sync.json",
 	}
 

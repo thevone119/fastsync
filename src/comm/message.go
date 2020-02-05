@@ -147,10 +147,10 @@ type CheckFileMsg struct {
 	CheckType byte      //校验文件类型 0:size校验 1:fastmd5 2:fullmd5
 }
 
-func NewCheckFileMsg(fp string, ck string,ct byte) *CheckFileMsg{
+func NewCheckFileMsg(fp string, ck []byte,ct byte) *CheckFileMsg{
 	return &CheckFileMsg{
 		Filepaht:fp,
-		Check:make([]byte,16),
+		Check:ck,
 		CheckType:ct,
 	}
 }
@@ -160,6 +160,7 @@ func NewCheckFileMsgByByte(b []byte) *CheckFileMsg{
 	var m MessageUtils
 	var c CheckFileMsg
 	c.Filepaht=m.ReadString(bytesBuffer)
+	c.Check = make([]byte,16)
 	bytesBuffer.Read(c.Check)
 	c.CheckType,_ = bytesBuffer.ReadByte()
 	return &c
