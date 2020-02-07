@@ -24,7 +24,11 @@ const (
 
 	MID_SendFileReq	//上传请求，请求进行某个文件上传
 	MID_SendFileReqRet	//上传请求的返回
-	MID_SendFile	//上传某个文件
+	MID_SendFile	//上传某个文件（块）
+	MID_SendFileRet	//上传某个文件（块）返回
+
+	MID_Request		//发送req
+	MID_Response	//返回rsp
 
 	MID_SendMessage
 )
@@ -139,8 +143,8 @@ func (m *LoginRetMsg) GetMsg() ziface.IMessage{
 type CheckFileMsg struct {
 	MessageUtils
 	Filepaht  string    //校验文件路径
-	Check []byte    	//校验文件MD5
-	CheckType byte      //校验文件类型 0:size校验 1:fastmd5 2:fullmd5
+	Check []byte    	//校验文件MD5（16 byte）
+	CheckType byte      //校验文件类型 0:不校验  1:size校验 2:fastmd5 3:fullmd5
 }
 
 func NewCheckFileMsg(fp string, ck []byte,ct byte) *CheckFileMsg{
@@ -172,7 +176,81 @@ func (m *CheckFileMsg) GetMsg() ziface.IMessage{
 }
 
 
-//5.CheckFileRetMsg
+//----------------------------------------------------------------------------------------MID_Request
+type RequestMsg struct {
+	MessageUtils
+	SecId  uint32    //发送请求的ID
+	MsgId uint32 	//子消息ID
+	Data []byte    	//返回的数据包
+}
+
+func NewRequestMsgMsg(sendid uint32,msgid uint32, data []byte) *RequestMsg{
+	return &RequestMsg{
+		SecId:sendid,
+		MsgId:msgid,
+		Data:data,
+	}
+}
+
+func NewRequestMsgMsgByByte(b []byte) *RequestMsg{
+	bytesBuffer := bytes.NewBuffer(b)
+	var c RequestMsg
+	binary.Read(bytesBuffer,binary.BigEndian,&c.SecId)
+	binary.Read(bytesBuffer,binary.BigEndian,&c.MsgId)
+	c.Data = make([]byte,bytesBuffer.Len())
+	bytesBuffer.Read(c.Data)
+	return &c
+}
+
+func (m *RequestMsg) GetMsg() ziface.IMessage{
+	bytesBuffer := bytes.NewBuffer([]byte{})
+	binary.Write(bytesBuffer, binary.BigEndian, m.SecId)
+	binary.Write(bytesBuffer, binary.BigEndian, m.MsgId)
+	bytesBuffer.Write(m.Data)
+	return znet.NewMsgPackage(MID_Request,bytesBuffer.Bytes())
+}
+
+
+
+
+//----------------------------------------------------------------------------------------MID_Request
+type ResponseMsg struct {
+	MessageUtils
+	SecId  uint32    //发送请求的ID
+	MsgId uint32 	//子消息ID
+	Data []byte    	//返回的数据包
+}
+
+func NewResponseMsg(sendid uint32,msgid uint32, data []byte) *ResponseMsg{
+	return &ResponseMsg{
+		SecId:sendid,
+		MsgId:msgid,
+		Data:data,
+	}
+}
+
+func NewResponseMsgByByte(b []byte) *ResponseMsg{
+	bytesBuffer := bytes.NewBuffer(b)
+	var c ResponseMsg
+	binary.Read(bytesBuffer,binary.BigEndian,&c.SecId)
+	binary.Read(bytesBuffer,binary.BigEndian,&c.MsgId)
+	c.Data = make([]byte,bytesBuffer.Len())
+	bytesBuffer.Read(c.Data)
+	return &c
+}
+
+func (m *ResponseMsg) GetMsg() ziface.IMessage{
+	bytesBuffer := bytes.NewBuffer([]byte{})
+	binary.Write(bytesBuffer, binary.BigEndian, m.SecId)
+	binary.Write(bytesBuffer, binary.BigEndian, m.MsgId)
+	bytesBuffer.Write(m.Data)
+	return znet.NewMsgPackage(MID_Response,bytesBuffer.Bytes())
+}
+
+
+
+
+//----------------------------------------------------------------------------------------CheckFileRetMsg
 type CheckFileRetMsg struct {
 	MessageUtils
 	Filepaht  string    //校验文件路径
@@ -204,15 +282,24 @@ func (m *CheckFileRetMsg) GetMsg() ziface.IMessage{
 
 
 
-//6.MID_SendFileReq 发送上传文件请求
+//----------------------------------------------------------------------------------------MID_SendFileReq 发送上传文件请求
 type SendFileReqMsg struct {
 	MessageUtils
-	Filepaht  string    //校验文件路径
 	ReqId uint32		//请求的ID
+	Flen int64		//文件大小
+	Check []byte    	//校验文件MD5（16 byte）
+	CheckType byte      //校验文件类型 0:不校验  1:size校验 2:fastmd5 3:fullmd5
+	IsUpload byte      //是否开启上传通道
+	Filepaht  string    //目标文件路径
 }
 
-func NewSendFileReqMsg(fp string) *SendFileReqMsg{
+func NewSendFileReqMsg(reqid uint32,fl int64,cbyte []byte,ctype byte,isupload byte,fp string) *SendFileReqMsg{
 	return &SendFileReqMsg{
+		ReqId:reqid,
+		Flen:fl,
+		Check:cbyte,
+		CheckType:ctype,
+		IsUpload:isupload,
 		Filepaht:fp,
 	}
 }
@@ -221,12 +308,23 @@ func NewSendFileReqMsgByByte(b []byte) *SendFileReqMsg{
 	bytesBuffer := bytes.NewBuffer(b)
 	var m MessageUtils
 	var c SendFileReqMsg
+	binary.Read(bytesBuffer,binary.BigEndian,&c.ReqId)
+	binary.Read(bytesBuffer,binary.BigEndian,&c.Flen)
+	c.Check = make([]byte,16)
+	bytesBuffer.Read(c.Check)
+	c.CheckType,_ = bytesBuffer.ReadByte()
+	c.IsUpload,_ = bytesBuffer.ReadByte()
 	c.Filepaht=m.ReadString(bytesBuffer)
 	return &c
 }
 
 func (m *SendFileReqMsg) GetMsg() ziface.IMessage{
 	bytesBuffer := bytes.NewBuffer([]byte{})
+	binary.Write(bytesBuffer, binary.BigEndian, m.ReqId)
+	binary.Write(bytesBuffer, binary.BigEndian, m.Flen)
+	bytesBuffer.Write(m.Check)
+	bytesBuffer.WriteByte(m.CheckType)
+	bytesBuffer.WriteByte(m.IsUpload)
 	m.WriteString(bytesBuffer,m.Filepaht)
 	return znet.NewMsgPackage(MID_SendFileReq,bytesBuffer.Bytes())
 }
@@ -241,7 +339,7 @@ func (m *SendFileReqMsg) GetMsg() ziface.IMessage{
 type SendFileReqRetMsg struct {
 	ReqId uint32		//请求的ID
 	RetId uint32		//返回的ID
-	RetCode byte		//返回码，做相关逻辑的 0:可以上传，1：无法上传
+	RetCode byte		//返回码，做相关逻辑的 0:可以上传，1：io失败，无法上传，2：文件一致，无需上传
 }
 
 func NewSendFileReqRetMsg(reqid uint32,retid uint32, retcode byte) *SendFileReqRetMsg{
@@ -273,20 +371,18 @@ func (m *SendFileReqRetMsg) GetMsg() ziface.IMessage{
 
 
 
-//7.MID_SendFile 上传某个文件，一次上传8K
+//-------------------------------------------------------------MID_SendFile 上传某个文件，一次上传4K
 type SendFileMsg struct {
 	SecId uint32 	//消息序列号ID
 	FileId uint32 	//文件句柄ID
-	Flen int64		//文件大小
 	Start int64		//开始位置
 	Fbyte []byte	//文件二进制
 }
 
-func NewSendFileMsg(secid uint32,fildid uint32, flen int64,start int64,fb []byte) *SendFileMsg{
+func NewSendFileMsg(secid uint32,fildid uint32, start int64,fb []byte) *SendFileMsg{
 	return &SendFileMsg{
 		SecId:secid,
 		FileId:fildid,
-		Flen:flen,
 		Start:start,
 		Fbyte:fb,
 	}
@@ -297,7 +393,6 @@ func NewSendFileMsgByByte(b []byte) *SendFileMsg{
 	var c SendFileMsg
 	binary.Read(bytesBuffer,binary.BigEndian,&c.SecId)
 	binary.Read(bytesBuffer,binary.BigEndian,&c.FileId)
-	binary.Read(bytesBuffer,binary.BigEndian,&c.Flen)
 	binary.Read(bytesBuffer,binary.BigEndian,&c.Start)
 	c.Fbyte=make([]byte,bytesBuffer.Len())
 	io.ReadFull(bytesBuffer,c.Fbyte)
@@ -308,9 +403,45 @@ func (m *SendFileMsg) GetMsg() ziface.IMessage{
 	bytesBuffer := bytes.NewBuffer([]byte{})
 	binary.Write(bytesBuffer, binary.BigEndian, m.SecId)
 	binary.Write(bytesBuffer, binary.BigEndian, m.FileId)
-	binary.Write(bytesBuffer, binary.BigEndian, m.Flen)
 	binary.Write(bytesBuffer, binary.BigEndian, m.Start)
 	bytesBuffer.Write(m.Fbyte)
 	return znet.NewMsgPackage(MID_SendFile,bytesBuffer.Bytes())
+}
+
+
+//-------------------------------------------------------------MID_SendFileRet 上传某个文件块，返回
+type SendFileRetMsg struct {
+	SecId uint32 	//消息序列号ID
+	FileId uint32 	//文件句柄ID
+	Start int64		//开始位置
+	RetCode byte		//返回码 0:未成功，1：成功
+}
+
+func NewSendFileRetMsg(secid uint32,fileid uint32,start int64, retcode byte) *SendFileRetMsg{
+	return &SendFileRetMsg{
+		SecId:secid,
+		FileId:fileid,
+		Start:start,
+		RetCode:retcode,
+	}
+}
+
+func NewSendFileRetMsgByByte(b []byte) *SendFileRetMsg{
+	bytesBuffer := bytes.NewBuffer(b)
+	var c SendFileRetMsg
+	binary.Read(bytesBuffer,binary.BigEndian,&c.SecId)
+	binary.Read(bytesBuffer,binary.BigEndian,&c.FileId)
+	binary.Read(bytesBuffer,binary.BigEndian,&c.Start)
+	c.RetCode,_ = bytesBuffer.ReadByte()
+	return &c
+}
+
+func (m *SendFileRetMsg) GetMsg() ziface.IMessage{
+	bytesBuffer := bytes.NewBuffer([]byte{})
+	binary.Write(bytesBuffer, binary.BigEndian, m.SecId)
+	binary.Write(bytesBuffer, binary.BigEndian, m.FileId)
+	binary.Write(bytesBuffer, binary.BigEndian, m.Start)
+	bytesBuffer.WriteByte(m.RetCode)
+	return znet.NewMsgPackage(MID_SendFileRet,bytesBuffer.Bytes())
 }
 

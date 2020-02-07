@@ -44,6 +44,8 @@ func main() {
 	s.AddRouter(comm.MID_KeepAlive, &server.KeepAliveRouter{})
 	s.AddRouter(comm.MID_Login, &server.LoginRouter{})
 	s.AddRouter(comm.MID_CheckFile, &server.CheckFileRouter{})
+	s.AddRouter(comm.MID_Request, &server.RequestRouter{})
+
 
 
 	//开启服务

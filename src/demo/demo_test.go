@@ -6,10 +6,13 @@ import (
 )
 
 func TestDog(t *testing.T){
-	username:="dfasdfa"
-
-	fmt.Println(username)
-	fmt.Println(username=="dfasdfa"&&username=="dfasdfa")
+	s := [3]int{1, 2, 3}
+	for i := 0; i < 2; i++ {
+		defer func() {
+			fmt.Println(s[i])
+		}()
+	}
+	fmt.Println("end")
 }
 
 func Login(userName string,pwd string){

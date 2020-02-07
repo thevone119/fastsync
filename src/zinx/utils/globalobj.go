@@ -99,7 +99,7 @@ func init() {
 		TcpPort:          8999,
 		Host:             "0.0.0.0",
 		MaxConn:          12000,
-		MaxPacketSize:    4096,
+		MaxPacketSize:    10240,
 		ConfFilePath:     "conf/zinx.json",
 		WorkerPoolSize:   10,
 		MaxWorkerTaskLen: 1024,

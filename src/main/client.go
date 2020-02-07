@@ -14,7 +14,11 @@ func main(){
 	go c.Process()
 	time.Sleep(2 * time.Second)
 	checkfile(c,"UnityPlayer.dll",2)
-
+	fload:=client.NewFileUpload(c,20,"")
+	fload.Upload("D:/test/UnityPlayer.dll","UnityPlayer.dll",1,callback)
+	fload.Upload("D:/test/UnityPlayer.dll","UnityPlayer.dll",1,callback)
+	fload.Upload("D:/test/UnityPlayer.dll","UnityPlayer.dll",1,callback)
+	fload.Upload("D:/test/UnityPlayer.dll","UnityPlayer.dll",1,callback)
 	select {
 	}
 }
@@ -33,4 +37,8 @@ func checkfile(c *client.NetWork,fp string,ct byte){
 	}else{
 		c.Enqueue(comm.NewCheckFileMsg(fp,md5,ct).GetMsg())
 	}
+}
+
+func callback(ret byte){
+
 }

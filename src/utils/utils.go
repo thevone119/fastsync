@@ -35,12 +35,16 @@ func GetNextInt() int32{
 	return intId
 }
 
-
+//校验文件的MD5
+//0:不校验  1:size校验 2:fastmd5  3:fullmd5
 func GetFileMd5(fp string,ct byte ) ([]byte, error){
+	if ct==0{
+		return make([]byte,16),nil
+	}
 	hash := md5.New()
 	var result []byte
 	switch ct {
-	case 0:
+	case 1:
 		info, err := os.Lstat(fp)
 		bytesBuffer := bytes.NewBuffer([]byte{})
 		if err!=nil{
@@ -53,7 +57,7 @@ func GetFileMd5(fp string,ct byte ) ([]byte, error){
 			return hash.Sum(result), nil
 		}
 
-	case 1:
+	case 2:
 		file, _ := os.Open(fp)
 		defer file.Close()
 		var result []byte
@@ -81,7 +85,7 @@ func GetFileMd5(fp string,ct byte ) ([]byte, error){
 		binary.BigEndian.PutUint64(len_b, uint64(buf_len))
 		hash.Write(len_b)
 		return hash.Sum(result), nil
-	case 2:
+	case 3:
 		file, _ := os.Open(fp)
 		defer file.Close()
 		var result []byte
