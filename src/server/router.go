@@ -58,7 +58,7 @@ func (this *LoginRouter) Handle(request ziface.IRequest) {
 
 
 
-var CheckFileMutex = new(sync.Mutex)
+var checkFileMutex = new(sync.Mutex)
 
 //校验文件处理
 type CheckFileRouter struct {
@@ -69,20 +69,21 @@ type CheckFileRouter struct {
 func (this *CheckFileRouter) Handle(request ziface.IRequest) {
 	zlog.Debug("CheckFile..." )
 
-	CheckFileMutex.Lock()
+	checkFileMutex.Lock()
 	//校验文件
 	ckcekf:=comm.NewCheckFileMsgByByte(request.GetData())
-	_,ok:=comm.TempMap.Get(ckcekf.Filepaht)
+	lockkey := fmt.Sprintf("CheckFile_%s", ckcekf.Filepaht)
+	_,ok:=comm.TempMap.Get(lockkey)
 	if ok{
 		request.GetConnection().SendBuffMsg(comm.NewCheckFileRetMsg(ckcekf.Filepaht,3).GetMsg())
 		zlog.Debug("CheckFile is lock by other", ckcekf.Filepaht)
-		CheckFileMutex.Unlock()
+		checkFileMutex.Unlock()
 		return
 	}else{
 		//锁1分钟
-		comm.TempMap.Put(ckcekf.Filepaht,"",60)
+		comm.TempMap.Put(lockkey,"",60)
 	}
-	CheckFileMutex.Unlock()
+	checkFileMutex.Unlock()
 
 
 	//fp :=comm.AppendPath(comm.SyncConfigObj.BasePath,ckcekf.Filepaht)
@@ -103,8 +104,8 @@ func (this *CheckFileRouter) Handle(request ziface.IRequest) {
 			zlog.Info("check file same", ckcekf.Filepaht)
 			request.GetConnection().SendBuffMsg(comm.NewCheckFileRetMsg(ckcekf.Filepaht,2).GetMsg())
 		}else{
-			zlog.Debug("old md5:", fmt.Sprintf("%x",ckcekf.Check))
-			zlog.Debug("new md5:", fmt.Sprintf("%x",md5))
+			//zlog.Debug("old md5:", fmt.Sprintf("%x",ckcekf.Check))
+			//zlog.Debug("new md5:", fmt.Sprintf("%x",md5))
 			zlog.Info("check file is different", ckcekf.Filepaht)
 			request.GetConnection().SendBuffMsg(comm.NewCheckFileRetMsg(ckcekf.Filepaht,1).GetMsg())
 		}
@@ -112,5 +113,59 @@ func (this *CheckFileRouter) Handle(request ziface.IRequest) {
 }
 
 
+
+var sendFileReqMutex = new(sync.Mutex)
+
+//上传文件请求
+type SendFileReqRouter struct {
+	znet.BaseRouter
+}
+
+//Ping Handle
+func (this *SendFileReqRouter) Handle(request ziface.IRequest) {
+	zlog.Debug("SendFileReq..." )
+
+	sendFileReqMutex.Lock()
+	//上传文件请求
+	ckcekf:=comm.NewCheckFileRetMsgByByte(request.GetData())
+	lockkey := fmt.Sprintf("SendFileReq_%s", ckcekf.Filepaht)
+	_,ok:=comm.TempMap.Get(lockkey)
+	if ok{
+		request.GetConnection().SendBuffMsg(comm.NewCheckFileRetMsg(ckcekf.Filepaht,3).GetMsg())
+		zlog.Debug("SendFileReq is lock by other", ckcekf.Filepaht)
+		checkFileMutex.Unlock()
+		return
+	}else{
+		//锁1分钟
+		comm.TempMap.Put(lockkey,"",60)
+	}
+	sendFileReqMutex.Unlock()
+
+
+	//fp :=comm.AppendPath(comm.SyncConfigObj.BasePath,ckcekf.Filepaht)
+	fp :=comm.AppendPath("/test2",ckcekf.Filepaht)
+	//如果文件不存在,则上传文件
+	if hasf,_:=comm.PathExists(fp);hasf==false{
+		request.GetConnection().SendBuffMsg(comm.NewCheckFileRetMsg(ckcekf.Filepaht,1).GetMsg())
+		zlog.Info("file not found", ckcekf.Filepaht)
+		return
+	}else{
+		//存在，则校验MD5
+		md5,err:=utils.GetFileMd5(fp,ckcekf.CheckType)
+		if err!=nil{
+			zlog.Error(err)
+			return
+		}
+		if bytes.Equal(md5,ckcekf.Check){
+			zlog.Info("check file same", ckcekf.Filepaht)
+			request.GetConnection().SendBuffMsg(comm.NewCheckFileRetMsg(ckcekf.Filepaht,2).GetMsg())
+		}else{
+			//zlog.Debug("old md5:", fmt.Sprintf("%x",ckcekf.Check))
+			//zlog.Debug("new md5:", fmt.Sprintf("%x",md5))
+			zlog.Info("check file is different", ckcekf.Filepaht)
+			request.GetConnection().SendBuffMsg(comm.NewCheckFileRetMsg(ckcekf.Filepaht,1).GetMsg())
+		}
+	}
+}
 
 

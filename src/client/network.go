@@ -27,13 +27,15 @@ type NetWork struct {
 	Conn net.Conn
 	TimeOutTime int64
 	TimeConnected int64
-	//是否已
+	//是否已登录
 	Login bool
+
+	receiveCallBack           map[uint32] func(ziface.IMessage)  //存放每个MsgId 处理方法
 }
 
 //一个新的网络
 func NewNetWork(ip string,port int) *NetWork{
-	return &NetWork{
+	n:=NetWork{
 		IP:ip,
 		Port:port,
 		Connected:false,
@@ -44,7 +46,13 @@ func NewNetWork(ip string,port int) *NetWork{
 		TimeOutTime:0,
 		TimeConnected:0,
 		Conn:nil,
+		receiveCallBack: make(map[uint32]func(ziface.IMessage)),
 	}
+
+	//加入2个默认的处理
+	n.AddCallBack(comm.MID_KeepAlive,n.doKeepalive)
+	n.AddCallBack(comm.MID_LoginRet,n.doLoginRet)
+	return &n
 }
 
 
@@ -87,12 +95,13 @@ func (n *NetWork) disconnect(){
 //死循环处理,主线程死循环调用,每秒循环调用
 func (n *NetWork) Process(){
 	for {
-		time.Sleep(1 * time.Second)
 		currtime:=time.Now().Unix()
 		//超过5秒没有连接上，则再次发起连接？
 		if (!n.Connected &&  currtime > n.TimeConnected+5 ){
 			n.connect()
 		}
+		time.Sleep(1 * time.Second)
+
 		if n.Connected == false{
 			continue
 		}
@@ -181,22 +190,37 @@ func (n *NetWork) receiveData(){
 	}
 }
 
+func (n *NetWork) AddCallBack(msgid uint32,cb func(ziface.IMessage)){
+	n.receiveCallBack[msgid]=cb
+}
+func (n *NetWork) RemoveCallBack(msgid uint32,cb func(ziface.IMessage)){
+	delete(n.receiveCallBack,msgid)
+}
+
+func (n *NetWork) doKeepalive(msg ziface.IMessage){
+	fmt.Println("Receive keepalive back")
+}
+
+func (n *NetWork) doLoginRet(msg ziface.IMessage){
+	lret :=comm.NewLoginSuccessByByte(msg.GetData())
+	if lret!=nil{
+		if(lret.Result==0){
+			n.Login = true
+			fmt.Println("Login succ")
+		}else{
+			n.Login = false
+		}
+	}
+}
+
 //所有数据在这里处理
 func (n *NetWork) doReceiveData(msg ziface.IMessage){
-	fmt.Println("Receive Data:",msg.GetMsgId())
-	switch msg.GetMsgId() {
-	case  comm.MID_KeepAlive:
-		fmt.Println("Receive keepalive back")
-	case comm.MID_LoginRet:
-		lret :=comm.NewLoginSuccessByByte(msg.GetData())
-		if lret!=nil{
-			if(lret.Result==0){
-				n.Login = true
-				fmt.Println("Login succ")
-			}else{
-				n.Login = false
-			}
-		}
+	handler, ok := n.receiveCallBack[msg.GetMsgId()]
+	if !ok {
+		zlog.Debug("Receive data msgId = ", msg.GetMsgId(), " is not handler func !")
+		return
+	}else{
+		handler(msg)
 	}
 }
 
