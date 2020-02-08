@@ -51,7 +51,7 @@ func NewNetWork(ip string,port int) *NetWork{
 		Connected:false,
 		Login:false,
 		ExitBuffChan: make(chan bool, 1),
-		sendMsgs: make(chan ziface.IMessage, 100),//缓存20个数据包 每个4K算的话，就是8M缓存
+		sendMsgs: make(chan ziface.IMessage, 100),//缓存100个数据包 每个4K算的话，就是8M缓存
 		receive: make(chan ziface.IMessage, 1024),
 		TimeOutTime:0,
 		TimeConnected:0,
@@ -202,7 +202,7 @@ func (n *NetWork) receiveData(){
 				fmt.Println("server unpack data err:", err)
 				return
 			}
-			//不放管道了，接受到所有数据都直接处理
+			//不放管道了，接受到所有数据都直接处理,单独开启线程处理
 			//n.Receive<-msg
 			n.doReceiveData(msg)
 		}

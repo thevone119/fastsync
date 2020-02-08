@@ -135,13 +135,14 @@ func (this *SyncFile) Open() error{
 //写文件数据
 //return 0:写入成功  1：写入成功，并且已写入结束  2：写入失败
 func (this *SyncFile) Write(sf *comm.SendFileMsg) byte{
+	//写锁
+	this.flock.Lock()
+	defer this.flock.Unlock()
 	this.LastTime = time.Now().Unix()
 	if this.FOpen==false || this.FH==nil{
 		return 2
 	}
-	//写锁
-	this.flock.Lock()
-	defer this.flock.Unlock()
+
 	_,err:=this.FH.Seek(sf.Start, io.SeekStart)
 	if err!=nil{
 		return 2
