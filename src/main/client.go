@@ -13,6 +13,13 @@ func main(){
 	c:=client.NewNetWork("127.0.0.1",8999)
 	go c.Process()
 	time.Sleep(2 * time.Second)
+	//测试10万个同步请求的耗时(28秒)
+	t1:=time.Now().Unix()
+	for i:=0;i<100000;i++{
+		c.Request(comm.NewKeepAliveMsg(1).GetMsg())
+	}
+	fmt.Println("usertime:",time.Now().Unix()-t1)
+
 	checkfile(c,"UnityPlayer.dll",2)
 	fload:=client.NewFileUpload(c,20,"")
 	go fload.Upload("D:/test/UnityPlayer.dll","UnityPlayer.dll",1,callback)

@@ -51,6 +51,7 @@ func (n *FileUpload) Upload(lp string,rp string,checktype byte,callback func(byt
 	}
 	reqid:=utils.GetNextUint()
 
+
 	//同步请求
 	retb,err:=n.netclient.Request(comm.NewSendFileReqMsg(reqid,filei.Size(),md5,checktype,1,rp).GetMsg())
 

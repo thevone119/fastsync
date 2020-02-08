@@ -286,6 +286,11 @@ func (n *NetWork) Request(msg ziface.IMessage) ([]byte,error){
 				return data.Data,nil
 			}
 		case <-time.After((time.Second * 20))://20秒超时
+			//关闭通道，释放资源
+			close(n.requestChan[_secId])
+			n.requestChanMutex.Lock()
+			delete(n.requestChan,_secId)
+			n.requestChanMutex.Unlock()
 			fmt.Println("request time out",_secId)
 			return nil,errors.New("request time out")
 

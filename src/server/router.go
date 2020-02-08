@@ -134,6 +134,9 @@ func (this *RequestRouter) Handle(request ziface.IRequest) {
 	case comm.MID_Login:
 
 		return
+	case comm.MID_KeepAlive:
+		request.GetConnection().SendBuffMsg(comm.NewResponseMsg(ckcekf.SecId,comm.MID_KeepAlive,comm.NewKeepAliveMsg(1).GetMsg().GetData()).GetMsg())
+		return
 	}
 
 
