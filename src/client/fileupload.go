@@ -61,15 +61,16 @@ func (n *FileUpload) Upload(lp string,rp string,checktype byte,callback func(byt
 
 	//同步请求
 	retb,err:=n.netclient.Request(comm.NewSendFileReqMsg(reqid,filei.Size(),md5,checktype,1,rp).GetMsg())
+
 	if err!=nil{
 		fmt.Println("request SendFileReqMsg error",lp,err)
 		callback(100)
 		return
 	}
 	reqret:=comm.NewSendFileReqRetMsgByByte(retb)
+	fmt.Println("ret:",reqret.RetId)
 	if reqret.RetCode==0{
 		//可以上传，上传文件
-		fmt.Println("ret:",reqret.RetId)
 		n.doUpload(lp,reqret.RetId,callback)
 	}
 	if reqret.RetCode==1{
@@ -116,9 +117,10 @@ func (n *FileUpload) doUpload(lp string,fh uint32,callback func(byte)){
 		n.sendFile[fh][start]=false
 		n.sendMapMutex.Unlock()
 		//发送
-		n.netclient.Enqueue(comm.NewSendFileMsg(0,fh,start,buff[:rn]).GetMsg())
+		n.netclient.SendData(comm.NewSendFileMsg(0,fh,start,buff[:rn]).GetMsg())
 		start+=int64(rn)
 	}
+	fmt.Println("read end")
 	n.sendMapMutex.Lock()
 	n.sendEnd[fh]=true
 	n.sendMapMutex.Unlock()
@@ -139,7 +141,6 @@ func (n *FileUpload) goSendFileRet(fileid uint32,callback func(byte)){
 				n.sendMapMutex.RLock()
 				if n.sendEnd[sret.FileId] && len(n.sendFile[sret.FileId])==0{
 					callback(1)
-
 					n.sendMapMutex.RUnlock()
 					return
 				}
@@ -152,6 +153,7 @@ func (n *FileUpload) goSendFileRet(fileid uint32,callback func(byte)){
 		return
 	}
 }
+
 
 //发送文件块返回哦
 func (n *FileUpload) doSendFileRet(msg ziface.IMessage){

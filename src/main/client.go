@@ -15,10 +15,10 @@ func main(){
 	time.Sleep(2 * time.Second)
 	checkfile(c,"UnityPlayer.dll",2)
 	fload:=client.NewFileUpload(c,20,"")
-	fload.Upload("D:/test/UnityPlayer.dll","UnityPlayer.dll",1,callback)
-	fload.Upload("D:/test/UnityPlayer.dll","UnityPlayer.dll",1,callback)
-	fload.Upload("D:/test/UnityPlayer.dll","UnityPlayer.dll",1,callback)
-	fload.Upload("D:/test/UnityPlayer.dll","UnityPlayer.dll",1,callback)
+	go fload.Upload("D:/test/UnityPlayer.dll","UnityPlayer.dll",1,callback)
+	//fload.Upload("D:/test/UnityPlayer.dll","UnityPlayer.dll",1,callback)
+	//fload.Upload("D:/test/UnityPlayer.dll","UnityPlayer.dll",1,callback)
+	//fload.Upload("D:/test/UnityPlayer.dll","UnityPlayer.dll",1,callback)
 	select {
 	}
 }

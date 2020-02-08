@@ -11,25 +11,16 @@ import (
 //创建连接的时候执行
 func DoConnectionBegin(conn ziface.IConnection) {
 	fmt.Println("DoConnecionBegin is Called ... ")
-	//设置两个链接属性，在连接创建之后
-	fmt.Println("Set conn Name, Home done!")
-	conn.SetProperty("Name", "Aceld")
-	conn.SetProperty("Home", "https://www.jianshu.com/u/35261429b7f1")
+
 
 }
 
 //连接断开的时候执行
 func DoConnectionLost(conn ziface.IConnection) {
-	//在连接销毁之前，查询conn的Name，Home属性
-	if name, err:= conn.GetProperty("Name"); err == nil {
-		fmt.Println("Conn Property Name = ", name)
-	}
+	fmt.Println("DoConnectionLost is Called ... ")
+	//在连接销毁之前，做连接捆绑内容的清理
+	server.SyncFileHandle.CloseAll(conn.GetConnID())
 
-	if home, err := conn.GetProperty("Home"); err == nil {
-		fmt.Println("Conn Property Home = ", home)
-	}
-
-	fmt.Println("DoConneciotnLost is Called ... ")
 }
 
 func main() {
@@ -40,11 +31,17 @@ func main() {
 	s.SetOnConnStart(DoConnectionBegin)
 	s.SetOnConnStop(DoConnectionLost)
 
-	//配置路由
+	//配置路由,保持连接
 	s.AddRouter(comm.MID_KeepAlive, &server.KeepAliveRouter{})
+	//配置路由,保持连接
 	s.AddRouter(comm.MID_Login, &server.LoginRouter{})
+	//配置路由,保持连接
 	s.AddRouter(comm.MID_CheckFile, &server.CheckFileRouter{})
+	//配置路由,保持连接
 	s.AddRouter(comm.MID_Request, &server.RequestRouter{})
+	//配置路由,保持连接
+	s.AddRouter(comm.MID_SendFile, &server.SendFileMsgRouter{})
+
 
 
 

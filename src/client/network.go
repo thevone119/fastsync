@@ -51,7 +51,7 @@ func NewNetWork(ip string,port int) *NetWork{
 		Connected:false,
 		Login:false,
 		ExitBuffChan: make(chan bool, 1),
-		sendMsgs: make(chan ziface.IMessage, 20),//缓存20个数据包 每个4K算的话，就是8M缓存
+		sendMsgs: make(chan ziface.IMessage, 100),//缓存20个数据包 每个4K算的话，就是8M缓存
 		receive: make(chan ziface.IMessage, 1024),
 		TimeOutTime:0,
 		TimeConnected:0,
@@ -89,7 +89,7 @@ func (n *NetWork) connect(){
 
 	//开启读写线程
 	go n.receiveData()
-	go n.sendData()
+	go n.gosendData()
 }
 
 //断开连接
@@ -132,14 +132,21 @@ func (n *NetWork) Enqueue(msg ziface.IMessage){
 	n.sendMsgs<-msg
 }
 
+func (n *NetWork) SendData(msg ziface.IMessage){
+	dp := znet.NewDataPack()
+	//有数据要发送
+	_d,_:=dp.Pack(msg)
+	if _, err := n.Conn.Write(_d); err != nil {
+		zlog.Error("Send Data error:, ", err, " Conn Writer exit")
+		return
+	}
+}
+
 //go线程调用
-func (n *NetWork) sendData(){
+func (n *NetWork) gosendData(){
 	//发封包message消息
 	dp := znet.NewDataPack()
 	for {
-		if n.Connected == false{
-			return
-		}
 		select {
 		case data, ok := <-n.sendMsgs:
 			if ok {
@@ -150,8 +157,8 @@ func (n *NetWork) sendData(){
 					return
 				}
 			} else {
-				break
 				zlog.Info("msgBuffChan is Closed")
+				break
 			}
 		case <-n.ExitBuffChan:
 			return
@@ -217,7 +224,7 @@ func (n *NetWork) doKeepalive(msg ziface.IMessage){
 func (n *NetWork) doResponse(msg ziface.IMessage){
 	ret :=comm.NewResponseMsgByByte(msg.GetData())
 	if ret!=nil{
-		//zlog.Debug("request back secid:",ret.SecId)
+		zlog.Debug("request back secid:",ret.SecId)
 		n.requestChanMutex.RLock()
 		n.requestChan[ret.SecId]<-ret
 		n.requestChanMutex.RUnlock()
@@ -274,7 +281,7 @@ func (n *NetWork) Request(msg ziface.IMessage) ([]byte,error){
 				n.requestChanMutex.Unlock()
 				return data.Data,nil
 			}
-		case <-time.After((time.Second * 2))://10秒超时
+		case <-time.After((time.Second * 20))://20秒超时
 			fmt.Println("request time out",_secId)
 			return nil,errors.New("request time out")
 

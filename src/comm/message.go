@@ -414,7 +414,7 @@ type SendFileRetMsg struct {
 	SecId uint32 	//消息序列号ID
 	FileId uint32 	//文件句柄ID
 	Start int64		//开始位置
-	RetCode byte		//返回码 0:未成功，1：成功
+	RetCode byte		//返回码 0:未成功，1：成功  2:服务器读写错误
 }
 
 func NewSendFileRetMsg(secid uint32,fileid uint32,start int64, retcode byte) *SendFileRetMsg{
