@@ -256,6 +256,7 @@ func (n *NetWork) doReceiveData(msg ziface.IMessage){
 
 //发送请求，获得返回，柱塞
 //10秒超时
+//这里每个请求创建一个专门的通道，性能是否有问题
 func (n *NetWork) Request(msg ziface.IMessage) ([]byte,error){
 	n.secIdMutex.Lock()
 	if n.secId>=math.MaxUint32{
@@ -264,13 +265,16 @@ func (n *NetWork) Request(msg ziface.IMessage) ([]byte,error){
 	n.secId++
 	_secId:=n.secId
 	n.secIdMutex.Unlock()
-	//发送
-	n.Enqueue(comm.NewRequestMsgMsg(_secId,msg.GetMsgId(),msg.GetData()).GetMsg())
+
 	//锁
 	n.requestChanMutex.Lock()
 	n.requestChan[_secId]=make(chan *comm.ResponseMsg)
 	n.requestChanMutex.Unlock()
-	//柱塞
+
+	//发送
+	n.Enqueue(comm.NewRequestMsgMsg(_secId,msg.GetMsgId(),msg.GetData()).GetMsg())
+
+	//柱塞通道，返回数据
 	select {
 		case data, ok := <-n.requestChan[_secId]:
 			if ok{
