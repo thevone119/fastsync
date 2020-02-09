@@ -8,6 +8,7 @@ import (
 )
 
 func main(){
+	//bolt 库
 	reader:=bufio.NewReader(os.Stdin)
 	for{
 		fmt.Print("$")
