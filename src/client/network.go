@@ -36,8 +36,8 @@ type NetWork struct {
 	receiveCallBack           map[uint32] func(ziface.IMessage)  //存放每个MsgId 处理方法
 
 	//独立的request通道，实现同步的request
-	requestChanMutex sync.RWMutex
-	requestChan           map[uint32] chan *comm.ResponseMsg  //request的管道，每个请求一个管道，知道管道中有数据，才返回
+	requestChanLock chan bool
+	requestChan           []chan *comm.ResponseMsg  //request的管道，10个管道并发
 
 	secId uint32
 	secIdMutex sync.Mutex
@@ -57,8 +57,14 @@ func NewNetWork(ip string,port int) *NetWork{
 		TimeConnected:0,
 		Conn:nil,
 		receiveCallBack: make(map[uint32]func(ziface.IMessage)),
-		requestChan: make(map[uint32] chan *comm.ResponseMsg),
+		requestChanLock: make(chan bool,10),
+		requestChan: make([]chan *comm.ResponseMsg,10),
 	}
+	//10个阻塞管道
+	for i:=0;i<10;i++{
+		n.requestChan[i]=make(chan *comm.ResponseMsg)
+	}
+
 
 	//加入2个默认的处理
 	n.AddCallBack(comm.MID_KeepAlive,n.doKeepalive)
@@ -225,9 +231,7 @@ func (n *NetWork) doResponse(msg ziface.IMessage){
 	ret :=comm.NewResponseMsgByByte(msg.GetData())
 	if ret!=nil{
 		zlog.Debug("request back secid:",ret.SecId)
-		n.requestChanMutex.RLock()
-		n.requestChan[ret.SecId]<-ret
-		n.requestChanMutex.RUnlock()
+		n.requestChan[ret.SecId%10]<-ret
 	}
 }
 
@@ -256,7 +260,6 @@ func (n *NetWork) doReceiveData(msg ziface.IMessage){
 
 //发送请求，获得返回，柱塞
 //10秒超时
-//这里每个请求创建一个专门的通道，性能是否有问题
 func (n *NetWork) Request(msg ziface.IMessage) ([]byte,error){
 	n.secIdMutex.Lock()
 	if n.secId>=math.MaxUint32{
@@ -266,34 +269,23 @@ func (n *NetWork) Request(msg ziface.IMessage) ([]byte,error){
 	_secId:=n.secId
 	n.secIdMutex.Unlock()
 
-	//锁
-	n.requestChanMutex.Lock()
-	n.requestChan[_secId]=make(chan *comm.ResponseMsg)
-	n.requestChanMutex.Unlock()
+	//10最多10个线程进入此
+	n.requestChanLock<-true
+	defer func() {<-n.requestChanLock}()
 
 	//发送
 	n.Enqueue(comm.NewRequestMsgMsg(_secId,msg.GetMsgId(),msg.GetData()).GetMsg())
 
-	//柱塞通道，返回数据
-	select {
-		case data, ok := <-n.requestChan[_secId]:
-			if ok{
-				//关闭通道，释放资源
-				close(n.requestChan[_secId])
-				n.requestChanMutex.Lock()
-				delete(n.requestChan,_secId)
-				n.requestChanMutex.Unlock()
+	//10秒超时
+	for {
+		select {
+		case data, ok := <-n.requestChan[_secId%10]:
+			if ok {
 				return data.Data,nil
 			}
-		case <-time.After((time.Second * 20))://20秒超时
-			//关闭通道，释放资源
-			close(n.requestChan[_secId])
-			n.requestChanMutex.Lock()
-			delete(n.requestChan,_secId)
-			n.requestChanMutex.Unlock()
-			fmt.Println("request time out",_secId)
+		case <-time.After(time.Duration(10) * time.Second):
 			return nil,errors.New("request time out")
-
+		}
 	}
 	return nil,errors.New("request time out")
 }

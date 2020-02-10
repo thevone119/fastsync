@@ -124,7 +124,7 @@ type RequestRouter struct {
 //request同步/异步请求处理
 func (this *RequestRouter) Handle(request ziface.IRequest) {
 	ckcekf:=comm.NewRequestMsgMsgByByte(request.GetData())
-	zlog.Debug("Request...",ckcekf.MsgId )
+	//zlog.Debug("Request...",ckcekf.MsgId )
 	switch ckcekf.MsgId {
 	case comm.MID_SendFileReq:
 		zlog.Debug("Request2...",ckcekf.MsgId )

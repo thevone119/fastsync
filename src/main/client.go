@@ -15,10 +15,16 @@ func main(){
 	time.Sleep(2 * time.Second)
 	//测试10万个同步请求的耗时(28秒)
 	t1:=time.Now().Unix()
-	for i:=0;i<100000;i++{
-		c.Request(comm.NewKeepAliveMsg(1).GetMsg())
+	for j:=0;j<5;j++{
+		go func() {
+			for i:=0;i<10000;i++{
+				c.Request(comm.NewKeepAliveMsg(1).GetMsg())
+			}
+			fmt.Println("usertime:",time.Now().Unix()-t1)
+		}()
 	}
-	fmt.Println("usertime:",time.Now().Unix()-t1)
+
+
 
 	checkfile(c,"UnityPlayer.dll",2)
 	fload:=client.NewFileUpload(c,20,"")
