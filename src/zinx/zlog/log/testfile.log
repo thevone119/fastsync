@@ -1,0 +1,61 @@
+<MODULE>2020/02/03 02:15:13 [DEBUG]zlogger_test.go:29: ===> zinx debug content ~~666
+<MODULE>2020/02/03 02:15:13 [DEBUG]zlogger_test.go:30: ===> zinx debug content ~~888
+<MODULE>2020/02/03 02:15:13 [ERROR]zlogger_test.go:31: ===> zinx Error!!!! ~~~555~~~
+<MODULE>2020/02/03 02:15:13 [ERROR]zlogger_test.go:37: ===> zinx Error  after debug close !!!!
+<MODULE>2020/02/03 02:19:31 [DEBUG]zlogger_test.go:29: ===> zinx debug content ~~666
+<MODULE>2020/02/03 02:19:31 [DEBUG]zlogger_test.go:30: ===> zinx debug content ~~888
+<MODULE>2020/02/03 02:19:31 [ERROR]zlogger_test.go:31: ===> zinx Error!!!! ~~~555~~~
+<MODULE>2020/02/03 02:20:56 [DEBUG]zlogger_test.go:29: ===> zinx debug content ~~666
+<MODULE>2020/02/03 02:20:56 [DEBUG]zlogger_test.go:30: ===> zinx debug content ~~888
+<MODULE>2020/02/03 02:20:56 [ERROR]zlogger_test.go:31: ===> zinx Error!!!! ~~~555~~~
+<MODULE>2020/02/03 02:21:56 [DEBUG]zlogger_test.go:29: ===> zinx debug content ~~666
+<MODULE>2020/02/03 02:21:56 [DEBUG]zlogger_test.go:30: ===> zinx debug content ~~888
+<MODULE>2020/02/03 02:21:56 [ERROR]zlogger_test.go:31: ===> zinx Error!!!! ~~~555~~~
+<MODULE>2020/02/03 02:22:16 [DEBUG]zlogger_test.go:29: ===> zinx debug content ~~666
+<MODULE>2020/02/03 02:22:16 [DEBUG]zlogger_test.go:30: ===> zinx debug content ~~888
+<MODULE>2020/02/03 02:22:16 [ERROR]zlogger_test.go:31: ===> zinx Error!!!! ~~~555~~~
+<MODULE>2020/02/03 02:22:16 [ERROR]zlogger_test.go:37: ===> zinx Error  after debug close !!!!
+2020/02/03 03:08:53 [DEBUG]zlogger_test.go:10: zinx debug content1
+2020/02/03 03:08:53 [DEBUG]zlogger_test.go:11: zinx debug content2
+2020/02/03 03:08:53 [DEBUG]zlogger_test.go:13:  zinx debug a = 10
+2020/02/03 [INFO]D:/GO_WORK/fastsync/src/zinx/zlog/zlogger_test.go:17: zinx info content
+<MODULE>2020/02/03 [ERROR]D:/GO_WORK/fastsync/src/zinx/zlog/zlogger_test.go:21: zinx error content
+<MODULE>2020/02/03 03:08:53 [ERROR]zlogger_test.go:25:  Zinx Stack! 
+goroutine 18 [running]:
+zinx/zlog.(*ZinxLogger).Stack(0xc042088210, 0xc04202def8, 0x1, 0x1)
+	D:/GO_WORK/fastsync/src/zinx/zlog/zlogger.go:274 +0xf3
+zinx/zlog.Stack(0xc04202def8, 0x1, 0x1)
+	D:/GO_WORK/fastsync/src/zinx/zlog/stdzlog.go:103 +0x52
+zinx/zlog.TestStdZLog(0xc04209a2d0)
+	D:/GO_WORK/fastsync/src/zinx/zlog/zlogger_test.go:25 +0x28c
+testing.tRunner(0xc04209a2d0, 0x558ce0)
+	C:/Go/src/testing/testing.go:747 +0xd7
+created by testing.(*T).Run
+	C:/Go/src/testing/testing.go:790 +0x2e5
+
+goroutine 1 [chan receive]:
+testing.(*T).Run(0xc04209a1e0, 0x54f86b, 0xb, 0x558ce0, 0x4725ed)
+	C:/Go/src/testing/testing.go:791 +0x303
+testing.runTests.func1(0xc04209a1e0)
+	C:/Go/src/testing/testing.go:1005 +0x6b
+testing.tRunner(0xc04209a1e0, 0xc042065de0)
+	C:/Go/src/testing/testing.go:747 +0xd7
+testing.runTests(0xc0420443c0, 0x5f9990, 0x1, 0x1, 0xb0)
+	C:/Go/src/testing/testing.go:1003 +0x2df
+testing.(*M).Run(0xc042065f18, 0xc042065f70)
+	C:/Go/src/testing/testing.go:922 +0x118
+main.main()
+	zinx/zlog/_test/_testmain.go:44 +0xe2
+
+<MODULE>2020/02/03 03:08:53 [DEBUG]zlogger_test.go:29: ===> zinx debug content ~~666
+<MODULE>2020/02/03 03:08:53 [DEBUG]zlogger_test.go:30: ===> zinx debug content ~~888
+<MODULE>2020/02/03 03:08:53 [ERROR]zlogger_test.go:31: ===> zinx Error!!!! ~~~555~~~
+<MODULE>2020/02/03 03:08:53 [ERROR]zlogger_test.go:37: ===> zinx Error  after debug close !!!!
+<MODULE>2020/02/03 03:19:31 [DEBUG]zlogger_test.go:30: ===> zinx debug content ~~666
+<MODULE>2020/02/03 03:19:31 [DEBUG]zlogger_test.go:31: ===> zinx debug content ~~888
+<MODULE>2020/02/03 03:19:31 [ERROR]zlogger_test.go:32: ===> zinx Error!!!! ~~~555~~~
+<MODULE>2020/02/03 03:19:31 [ERROR]zlogger_test.go:38: ===> zinx Error  after debug close !!!!
+<MODULE>2020/02/03 03:21:49 [DEBUG]zlogger_test.go:29: ===> zinx debug content ~~666
+<MODULE>2020/02/03 03:21:49 [DEBUG]zlogger_test.go:30: ===> zinx debug content ~~888
+<MODULE>2020/02/03 03:21:49 [ERROR]zlogger_test.go:31: ===> zinx Error!!!! ~~~555~~~
+<MODULE>2020/02/03 03:21:49 [ERROR]zlogger_test.go:37: ===> zinx Error  after debug close !!!!
