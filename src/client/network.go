@@ -19,78 +19,81 @@ type NetWork struct {
 	//服务绑定的IP地址
 	IP string
 	//服务绑定的端口
-	Port int
+	Port      int
+	UserName  string
+	PassWord  string
 	Connected bool
 
 	//告知该链接已经退出/停止的channel
 	ExitBuffChan chan bool
-	sendMsgs chan ziface.IMessage //发送消息管道 1024
-	receive chan ziface.IMessage //接受到消息的管道 1024
+	sendMsgs     chan ziface.IMessage //发送消息管道 1024
+	receive      chan ziface.IMessage //接受到消息的管道 1024
 	//当前连接的socket TCP套接字
-	Conn net.Conn
-	TimeOutTime int64
+	Conn          net.Conn
+	TimeOutTime   int64
 	TimeConnected int64
 	//是否已登录
 	Login bool
 
-	receiveCallBack           map[uint32] func(ziface.IMessage)  //存放每个MsgId 处理方法
+	receiveCallBack map[uint32]func(ziface.IMessage) //存放每个MsgId 处理方法
 
 	//独立的request通道，实现同步的request
 	requestChanLock chan bool
-	requestChan           []chan *comm.ResponseMsg  //request的管道，10个管道并发
+	requestChan     []chan *comm.ResponseMsg //request的管道，10个管道并发
 
-	secId uint32
+	secId      uint32
 	secIdMutex sync.Mutex
 }
 
 //一个新的网络
-func NewNetWork(ip string,port int) *NetWork{
-	n:=NetWork{
-		IP:ip,
-		Port:port,
-		Connected:false,
-		Login:false,
-		ExitBuffChan: make(chan bool, 1),
-		sendMsgs: make(chan ziface.IMessage, 100),//缓存100个数据包 每个4K算的话，就是8M缓存
-		receive: make(chan ziface.IMessage, 1024),
-		TimeOutTime:0,
-		TimeConnected:0,
-		Conn:nil,
+func NewNetWork(ip string, port int, username string, password string) *NetWork {
+	n := NetWork{
+		IP:              ip,
+		Port:            port,
+		UserName:        username,
+		PassWord:        password,
+		Connected:       false,
+		Login:           false,
+		ExitBuffChan:    make(chan bool, 1),
+		sendMsgs:        make(chan ziface.IMessage, 100), //缓存100个数据包 每个4K算的话，就是8M缓存
+		receive:         make(chan ziface.IMessage, 1024),
+		TimeOutTime:     0,
+		TimeConnected:   0,
+		Conn:            nil,
 		receiveCallBack: make(map[uint32]func(ziface.IMessage)),
-		requestChanLock: make(chan bool,10),
-		requestChan: make([]chan *comm.ResponseMsg,10),
+		requestChanLock: make(chan bool, 10),
+		requestChan:     make([]chan *comm.ResponseMsg, 10),
 	}
 	//10个阻塞管道
-	for i:=0;i<10;i++{
-		n.requestChan[i]=make(chan *comm.ResponseMsg)
+	for i := 0; i < 10; i++ {
+		n.requestChan[i] = make(chan *comm.ResponseMsg)
 	}
 
-
-	//加入2个默认的处理
-	n.AddCallBack(comm.MID_KeepAlive,n.doKeepalive)
-	n.AddCallBack(comm.MID_LoginRet,n.doLoginRet)
-	n.AddCallBack(comm.MID_Response,n.doResponse)
+	//加入几个默认的处理
+	n.AddCallBack(comm.MID_KeepAlive, n.doKeepalive)
+	n.AddCallBack(comm.MID_LoginRet, n.doLoginRet)
+	n.AddCallBack(comm.MID_Response, n.doResponse)
+	//启动线程做自处理，保持会话，链接
+	go n.process()
 	return &n
 }
 
-
 //连接网络
-func (n *NetWork) connect(){
+func (n *NetWork) connect() {
 	n.TimeConnected = time.Now().Unix()
-	n.TimeOutTime= time.Now().Unix()
-	adder :=fmt.Sprintf("%s:%d", n.IP, n.Port)
-	fmt.Println("connect to:",adder)
-	conn,err := net.Dial("tcp", adder)
+	n.TimeOutTime = time.Now().Unix()
+	adder := fmt.Sprintf("%s:%d", n.IP, n.Port)
+	fmt.Println("connect to:", adder)
+	conn, err := net.DialTimeout("tcp", adder, time.Duration(3)*time.Second)
 	if err != nil {
-		fmt.Println("NetWork Connect err!",adder)
+		fmt.Println("NetWork Connect err!", adder)
 		return
 	}
 	//登录认证
-	n.Enqueue(comm.NewLoginMsg("admin","admin").GetMsg())
+	n.Enqueue(comm.NewLoginMsg(n.UserName, n.PassWord).GetMsg())
 
-
-	fmt.Println("NetWork Connect succ!",n.IP)
-	n.Conn=conn
+	fmt.Println("NetWork Connect succ!", n.IP)
+	n.Conn = conn
 	n.Connected = true
 
 	//开启读写线程
@@ -99,33 +102,30 @@ func (n *NetWork) connect(){
 }
 
 //断开连接
-func (n *NetWork) disconnect(){
+func (n *NetWork) disconnect() {
 	n.Connected = false
 	n.Login = false
-	n.ExitBuffChan<-true
+	n.ExitBuffChan <- true
 	n.Conn.Close()
 	//close(n.SendMsgs)
 	//close(n.Receive)
 }
 
-
-
 //死循环处理,主线程死循环调用,每秒循环调用
-func (n *NetWork) Process(){
+func (n *NetWork) process() {
 	for {
-		currtime:=time.Now().Unix()
+		currtime := time.Now().Unix()
 		//超过5秒没有连接上，则再次发起连接？
-		if (!n.Connected &&  currtime > n.TimeConnected+5 ){
+		if !n.Connected && currtime > n.TimeConnected+5 {
 			n.connect()
 		}
 		time.Sleep(1 * time.Second)
-
-		if n.Connected == false{
+		if n.Connected == false {
 			continue
 		}
 		//超时发送心跳包？每5秒发送一个？心跳包是空的？
-		if (currtime> n.TimeOutTime ){
-			n.TimeOutTime=currtime+5
+		if n.Connected && currtime > n.TimeOutTime {
+			n.TimeOutTime = currtime + 5
 			n.Enqueue(comm.NewKeepAliveMsg(currtime).GetMsg())
 		}
 		//如果有接受管道中有数据，则开启线程处理管道中的数据
@@ -134,14 +134,14 @@ func (n *NetWork) Process(){
 }
 
 //把数据放入待发送队列
-func (n *NetWork) Enqueue(msg ziface.IMessage){
-	n.sendMsgs<-msg
+func (n *NetWork) Enqueue(msg ziface.IMessage) {
+	n.sendMsgs <- msg
 }
 
-func (n *NetWork) SendData(msg ziface.IMessage){
+func (n *NetWork) SendData(msg ziface.IMessage) {
 	dp := znet.NewDataPack()
 	//有数据要发送
-	_d,_:=dp.Pack(msg)
+	_d, _ := dp.Pack(msg)
 	if _, err := n.Conn.Write(_d); err != nil {
 		zlog.Error("Send Data error:, ", err, " Conn Writer exit")
 		return
@@ -149,7 +149,7 @@ func (n *NetWork) SendData(msg ziface.IMessage){
 }
 
 //go线程调用
-func (n *NetWork) gosendData(){
+func (n *NetWork) gosendData() {
 	//发封包message消息
 	dp := znet.NewDataPack()
 	for {
@@ -157,7 +157,7 @@ func (n *NetWork) gosendData(){
 		case data, ok := <-n.sendMsgs:
 			if ok {
 				//有数据要发送
-				_d,_:=dp.Pack(data)
+				_d, _ := dp.Pack(data)
 				if _, err := n.Conn.Write(_d); err != nil {
 					zlog.Error("Send Buff Data error:, ", err, " Conn Writer exit")
 					return
@@ -172,12 +172,11 @@ func (n *NetWork) gosendData(){
 	}
 }
 
-
 //接受到数据,这个方法不对外,go方法，循环读取数据
-func (n *NetWork) receiveData(){
+func (n *NetWork) receiveData() {
 	defer n.disconnect()
 	for {
-		if n.Connected==false{
+		if n.Connected == false {
 			return
 		}
 		//发封包message消息
@@ -215,83 +214,77 @@ func (n *NetWork) receiveData(){
 	}
 }
 
-func (n *NetWork) AddCallBack(msgid uint32,cb func(ziface.IMessage)){
-	n.receiveCallBack[msgid]=cb
+func (n *NetWork) AddCallBack(msgid uint32, cb func(ziface.IMessage)) {
+	n.receiveCallBack[msgid] = cb
 }
-func (n *NetWork) RemoveCallBack(msgid uint32,cb func(ziface.IMessage)){
-	delete(n.receiveCallBack,msgid)
-}
-
-func (n *NetWork) doKeepalive(msg ziface.IMessage){
-	fmt.Println("Receive keepalive back")
+func (n *NetWork) RemoveCallBack(msgid uint32, cb func(ziface.IMessage)) {
+	delete(n.receiveCallBack, msgid)
 }
 
+func (n *NetWork) doKeepalive(msg ziface.IMessage) {
+	zlog.Debug("Receive keepalive back")
+}
 
-func (n *NetWork) doResponse(msg ziface.IMessage){
-	ret :=comm.NewResponseMsgByByte(msg.GetData())
-	if ret!=nil{
-		zlog.Debug("request back secid:",ret.SecId)
-		n.requestChan[ret.SecId%10]<-ret
+func (n *NetWork) doResponse(msg ziface.IMessage) {
+	ret := comm.NewResponseMsgByByte(msg.GetData())
+	if ret != nil {
+		zlog.Debug("request back secid:", ret.SecId)
+		n.requestChan[ret.SecId%10] <- ret
 	}
 }
 
-func (n *NetWork) doLoginRet(msg ziface.IMessage){
-	lret :=comm.NewLoginSuccessByByte(msg.GetData())
-	if lret!=nil{
-		if(lret.Result==0){
+func (n *NetWork) doLoginRet(msg ziface.IMessage) {
+	lret := comm.NewLoginSuccessByByte(msg.GetData())
+	if lret != nil {
+		if lret.Result == 0 {
 			n.Login = true
-			fmt.Println("Login succ")
-		}else{
+			zlog.Debug("Login succ")
+		} else {
+			zlog.Debug("Login error")
 			n.Login = false
 		}
 	}
 }
 
 //所有数据在这里处理
-func (n *NetWork) doReceiveData(msg ziface.IMessage){
+func (n *NetWork) doReceiveData(msg ziface.IMessage) {
 	handler, ok := n.receiveCallBack[msg.GetMsgId()]
 	if !ok {
 		zlog.Debug("Receive data msgId = ", msg.GetMsgId(), " is not handler func !")
 		return
-	}else{
+	} else {
 		handler(msg)
 	}
 }
 
 //发送请求，获得返回，柱塞
 //10秒超时
-func (n *NetWork) Request(msg ziface.IMessage) ([]byte,error){
+func (n *NetWork) Request(msg ziface.IMessage) ([]byte, error) {
 	n.secIdMutex.Lock()
-	if n.secId>=math.MaxUint32{
-		n.secId=1
+	if n.secId >= math.MaxUint32 {
+		n.secId = 1
 	}
 	n.secId++
-	_secId:=n.secId
+	_secId := n.secId
 	n.secIdMutex.Unlock()
 
 	//10最多10个线程进入此
-	n.requestChanLock<-true
-	defer func() {<-n.requestChanLock}()
+	n.requestChanLock <- true
+	defer func() { <-n.requestChanLock }()
 
 	//发送
-	n.Enqueue(comm.NewRequestMsgMsg(_secId,msg.GetMsgId(),msg.GetData()).GetMsg())
+	n.Enqueue(comm.NewRequestMsgMsg(_secId, msg.GetMsgId(), msg.GetData()).GetMsg())
 
 	//10秒超时
 	for {
 		select {
 		case data, ok := <-n.requestChan[_secId%10]:
 			if ok {
-				return data.Data,nil
+				return data.Data, nil
 			}
 		case <-time.After(time.Duration(10) * time.Second):
-			return nil,errors.New("request time out")
+			return nil, errors.New("request time out")
 		}
 	}
-	return nil,errors.New("request time out")
+	return nil, errors.New("request time out")
 }
-
-
-
-
-
-
