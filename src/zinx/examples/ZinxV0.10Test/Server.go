@@ -19,7 +19,7 @@ func (this *PingRouter) Handle(request ziface.IRequest) {
 	//先读取客户端的数据，再回写ping...ping...ping
 	fmt.Println("recv from client : msgId=", request.GetMsgID(), ", data=", string(request.GetData()))
 
-	err := request.GetConnection().SendBuffMsg(znet.NewMsgPackage(1,[]byte("dddddd")))
+	err := request.GetConnection().SendBuffMsg(znet.NewMsgPackage(1, []byte("dddddd")))
 	if err != nil {
 		zlog.Error(err)
 	}
@@ -36,7 +36,7 @@ func (this *HelloZinxRouter) Handle(request ziface.IRequest) {
 	//先读取客户端的数据，再回写ping...ping...ping
 	fmt.Println("recv from client : msgId=", request.GetMsgID(), ", data=", string(request.GetData()))
 
-	err := request.GetConnection().SendBuffMsg(znet.NewMsgPackage(1,[]byte("dddddd")))
+	err := request.GetConnection().SendBuffMsg(znet.NewMsgPackage(1, []byte("dddddd")))
 	if err != nil {
 		zlog.Error(err)
 	}
@@ -51,7 +51,7 @@ func DoConnectionBegin(conn ziface.IConnection) {
 	conn.SetProperty("Name", "Aceld")
 	conn.SetProperty("Home", "https://www.jianshu.com/u/35261429b7f1")
 
-	err := conn.SendMsg(znet.NewMsgPackage(2,[]byte("dddddd")))
+	err := conn.SendMsg(znet.NewMsgPackage(2, []byte("dddddd")))
 	if err != nil {
 		zlog.Error(err)
 	}
@@ -60,7 +60,7 @@ func DoConnectionBegin(conn ziface.IConnection) {
 //连接断开的时候执行
 func DoConnectionLost(conn ziface.IConnection) {
 	//在连接销毁之前，查询conn的Name，Home属性
-	if name, err:= conn.GetProperty("Name"); err == nil {
+	if name, err := conn.GetProperty("Name"); err == nil {
 		fmt.Println("Conn Property Name = ", name)
 	}
 
@@ -74,7 +74,7 @@ func DoConnectionLost(conn ziface.IConnection) {
 func main() {
 	//创建一个server句柄
 	s := znet.NewServer()
-	zlog.SetLogFile("./log", "testfile2.log")
+	//zlog.SetLogFile("./log", "testfile2.log")
 	//注册链接hook回调函数
 	s.SetOnConnStart(DoConnectionBegin)
 	s.SetOnConnStop(DoConnectionLost)

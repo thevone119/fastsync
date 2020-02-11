@@ -2,12 +2,14 @@ package comm
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 )
 
 type SyncConfig struct {
-	BasePath string
+	BasePath     string
 	ConfFilePath string
+	RemotePath   []string
 }
 
 /*
@@ -15,19 +17,19 @@ type SyncConfig struct {
 */
 var SyncConfigObj *SyncConfig
 
-
 /*
 	提供init方法，默认加载
 */
 func init() {
 	//初始化GlobalObject变量，设置一些默认值
 	SyncConfigObj = &SyncConfig{
-		BasePath:             "/test",
-		ConfFilePath:"conf/sync.json",
+		BasePath:     "/test",
+		ConfFilePath: "conf/sync.json",
 	}
 
 	//从配置文件中加载一些用户配置的参数
 	SyncConfigObj.Reload()
+	fmt.Println("SyncConfig load BasePath:", SyncConfigObj.BasePath, "RemotePath len:", len(SyncConfigObj.RemotePath))
 }
 
 //读取用户的配置文件
@@ -46,5 +48,3 @@ func (g *SyncConfig) Reload() {
 	err = json.Unmarshal(data, g)
 
 }
-
-
