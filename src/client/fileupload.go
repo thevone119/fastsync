@@ -116,3 +116,18 @@ func (n *FileUpload) doSendFileRet(msg ziface.IMessage) {
 	//sret :=comm.NewSendFileRetMsgByByte(msg.GetData())
 
 }
+
+//删除文件，包括文件夹
+func (n *FileUpload) deleteFile(rp string) {
+	n.netclient.Enqueue(comm.NewDeleteFileRetMsg(0, 0, rp).GetMsg())
+}
+
+//复制文件，包括文件夹
+func (n *FileUpload) copyFile(srcrp string, dstrp string) {
+	n.netclient.Enqueue(comm.NewMoveFileReqMsg(0, 0, srcrp, dstrp).GetMsg())
+}
+
+//移动文件 ，包括文件夹
+func (n *FileUpload) moveFile(srcrp string, dstrp string) {
+	n.netclient.Enqueue(comm.NewMoveFileReqMsg(0, 1, srcrp, dstrp).GetMsg())
+}

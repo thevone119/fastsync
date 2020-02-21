@@ -69,8 +69,18 @@ func (c *ClientUpManager) SyncFile(lp string) {
 	c.SecId++
 }
 
-//删除服务器中的某个文件
-func (c *ClientUpManager) DeleteRemoteFile(lp string) {
-	fmt.Println("DeleteRemoteFile..", lp)
+//删除服务器中的某个文件,包括文件夹
+func (c *ClientUpManager) DeleteRemoteFile(rp string) {
+	fmt.Println("DeleteRemoteFile..", rp)
+	for _, fu := range c.RemoteUpLoad {
+		fu.deleteFile(rp)
+	}
+}
 
+//复制服务器的文件，包括文件夹
+func (c *ClientUpManager) CopyRemoteFile(rp string) {
+	fmt.Println("CopyRemoteFile..", rp)
+	for _, fu := range c.RemoteUpLoad {
+		fu.deleteFile(rp)
+	}
 }
