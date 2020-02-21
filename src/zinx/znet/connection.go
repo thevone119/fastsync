@@ -20,8 +20,10 @@ type Connection struct {
 	//当前连接的关闭状态
 	isClosed bool
 	//消息管理MsgId和对应处理方法的消息管理模块
-
 	MsgHandler ziface.IMsgHandle
+
+	//是否登录
+	IsLogin bool
 
 	//告知该链接已经退出/停止的channel
 	ExitBuffChan chan bool
@@ -44,6 +46,7 @@ func NewConntion(server ziface.IServer, conn *net.TCPConn, connID uint32, msgHan
 		Conn:         conn,
 		ConnID:       connID,
 		isClosed:     false,
+		IsLogin:      false,
 		MsgHandler:   msgHandler,
 		ExitBuffChan: make(chan bool, 1),
 		msgChan:      make(chan []byte),
@@ -187,6 +190,14 @@ func (c *Connection) GetTCPConnection() *net.TCPConn {
 //获取当前连接ID
 func (c *Connection) GetConnID() uint32 {
 	return c.ConnID
+}
+
+//获取当前连接是否已登录
+func (c *Connection) GetIsLogin() bool {
+	return c.IsLogin
+}
+func (c *Connection) SetIsLogin(islogin bool) {
+	c.IsLogin = islogin
 }
 
 //获取远程客户端地址信息

@@ -113,24 +113,29 @@ func (n *NetWork) disconnect() {
 
 //死循环处理,主线程死循环调用,每秒循环调用
 func (n *NetWork) process() {
+	if !n.Connected {
+		n.connect()
+	}
+	ticker := time.NewTicker(1 * time.Second)
 	for {
 		currtime := time.Now().Unix()
-		//超过5秒没有连接上，则再次发起连接？
-		if !n.Connected && currtime > n.TimeConnected+5 {
-			n.connect()
+		select {
+		case <-ticker.C:
+			//超过5秒没有连接上，则再次发起连接？
+			if !n.Connected && currtime > n.TimeConnected+5 {
+				n.connect()
+			}
+			if n.Connected == false {
+				continue
+			}
+			//超时发送心跳包？每10秒发送一个？心跳包是空的？
+			if n.Connected && currtime > n.TimeOutTime {
+				n.TimeOutTime = currtime + 5
+				n.Enqueue(comm.NewKeepAliveMsg(time.Now().Unix()).GetMsg())
+			}
 		}
-		time.Sleep(1 * time.Second)
-		if n.Connected == false {
-			continue
-		}
-		//超时发送心跳包？每5秒发送一个？心跳包是空的？
-		if n.Connected && currtime > n.TimeOutTime {
-			n.TimeOutTime = currtime + 5
-			n.Enqueue(comm.NewKeepAliveMsg(currtime).GetMsg())
-		}
-		//如果有接受管道中有数据，则开启线程处理管道中的数据
-
 	}
+
 }
 
 //把数据放入待发送队列

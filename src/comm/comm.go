@@ -18,14 +18,16 @@ func PathExists(path string) (bool, error) {
 	return false, err
 }
 
-
 //路径连接，串联
-func AppendPath(p1 string,p2 string) string{
-	if strings.LastIndex(p1,"/")==len(p1)-1{
-		p1 = p1[0:len(p1)-2]
+func AppendPath(p1 string, p2 string) string {
+	if strings.LastIndex(p1, "/") == len(p1)-1 {
+		p1 = p1[0 : len(p1)-2]
 	}
-	if(strings.Index(p2,"/")==0){
-		p2=p2[1:]
+	if strings.LastIndex(p2, "/") == len(p2)-1 {
+		p2 = p2[0 : len(p2)-2]
 	}
-	return p1+"/"+p2
+	if strings.Index(p2, "/") == 0 {
+		p2 = p2[1:]
+	}
+	return p1 + "/" + p2
 }

@@ -1,7 +1,6 @@
 package client
 
 import (
-	"comm"
 	"fmt"
 	"io/ioutil"
 	"strconv"
@@ -18,12 +17,12 @@ type ClientUpManager struct {
 //装载所有的配置，启动所有的客户端监听，保持长连接
 func NewClientUpManager() *ClientUpManager {
 	cm := &ClientUpManager{
-		RemoteUpLoad: make([]*FileUpload, len(comm.SyncConfigObj.RemotePath)),
+		RemoteUpLoad: make([]*FileUpload, len(ClientConfigObj.RemotePath)),
 	}
 
 	//装置客户端上传类
-	for i := 0; i < len(comm.SyncConfigObj.RemotePath); i++ {
-		cm.RemoteUpLoad[i] = srtToFileUpload(comm.SyncConfigObj.RemotePath[i])
+	for i := 0; i < len(ClientConfigObj.RemotePath); i++ {
+		cm.RemoteUpLoad[i] = srtToFileUpload(ClientConfigObj.RemotePath[i])
 	}
 	return cm
 }
@@ -63,7 +62,7 @@ func (c *ClientUpManager) SyncPath(lp string) {
 //同步某个文件到服务器
 func (c *ClientUpManager) SyncFile(lp string) {
 	for _, fu := range c.RemoteUpLoad {
-		rp := lp[strings.Index(lp, comm.SyncConfigObj.BasePath)+len(comm.SyncConfigObj.BasePath):]
+		rp := lp[strings.Index(lp, ClientConfigObj.BasePath)+len(ClientConfigObj.BasePath):]
 		fu.SyncFile(lp, rp)
 	}
 	fmt.Println("SyncFile..", lp)

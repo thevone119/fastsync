@@ -92,7 +92,7 @@ func NewSyncFile(cid uint32, reqid uint32, fp string, flen int64) *SyncFile {
 		FilePt:    fp,
 		Flen:      flen,
 		FileId:    utils.GetNextUint(),
-		FileAPath: comm.AppendPath("/test2", fp),
+		FileAPath: comm.AppendPath(ServerConfigObj.BasePath, fp),
 		FH:        nil,
 		FOpen:     false,
 		HasFile:   false,

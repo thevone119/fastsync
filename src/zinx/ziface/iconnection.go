@@ -22,14 +22,14 @@ type IConnection interface {
 	//直接将Message数据发送给远程的TCP客户端(有缓冲)
 	SendBuffMsg(msg IMessage) error
 
-
 	//设置链接属性
 	SetProperty(key string, value interface{})
 	//获取链接属性
-	GetProperty(key string)(interface{}, error)
+	GetProperty(key string) (interface{}, error)
 	//移除链接属性
 	RemoveProperty(key string)
 
+	//是否登录
+	GetIsLogin() bool
+	SetIsLogin(l bool)
 }
-
-

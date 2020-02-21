@@ -1,12 +1,14 @@
-package comm
+package client
 
 import (
+	"comm"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 )
 
-type SyncConfig struct {
+//客户端配置
+type clientConfig struct {
 	BasePath     string
 	ConfFilePath string
 	RemotePath   []string
@@ -15,27 +17,27 @@ type SyncConfig struct {
 /*
 	定义一个全局的对象
 */
-var SyncConfigObj *SyncConfig
+var ClientConfigObj *clientConfig
 
 /*
 	提供init方法，默认加载
 */
 func init() {
 	//初始化GlobalObject变量，设置一些默认值
-	SyncConfigObj = &SyncConfig{
+	ClientConfigObj = &clientConfig{
 		BasePath:     "/test",
-		ConfFilePath: "conf/sync.json",
+		ConfFilePath: "conf/client.json",
 	}
 
 	//从配置文件中加载一些用户配置的参数
-	SyncConfigObj.Reload()
-	fmt.Println("SyncConfig load BasePath:", SyncConfigObj.BasePath, "RemotePath len:", len(SyncConfigObj.RemotePath))
+	ClientConfigObj.Reload()
+	fmt.Println("SyncConfig load BasePath:", ClientConfigObj.BasePath, "RemotePath len:", len(ClientConfigObj.RemotePath))
 }
 
 //读取用户的配置文件
-func (g *SyncConfig) Reload() {
+func (g *clientConfig) Reload() {
 
-	if confFileExists, _ := PathExists(g.ConfFilePath); confFileExists != true {
+	if confFileExists, _ := comm.PathExists(g.ConfFilePath); confFileExists != true {
 		//fmt.Println("Config File ", g.ConfFilePath , " is not exist!!")
 		return
 	}

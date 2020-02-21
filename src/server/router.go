@@ -46,14 +46,16 @@ func (this *LoginRouter) Handle(request ziface.IRequest) {
 	login := comm.NewLoginMsgByByte(request.GetData())
 	//zlog.Info("Login ..." ,login.UserName,login.Pwd)
 
-	if login.UserName == "admin" && login.Pwd == "admin" {
+	if login.UserName == ServerConfigObj.UserName && login.Pwd == ServerConfigObj.PassWord {
 		uid := utils.GetNextUint()
+		request.GetConnection().SetIsLogin(true)
 		request.GetConnection().SetProperty("SESSION_ID", uid)
 		request.GetConnection().SetProperty("USER_NAME", login.UserName)
 		//登录成功
 		request.GetConnection().SendBuffMsg(comm.NewLoginRetMsg(uid, 0).GetMsg())
 		zlog.Info("Login suss...", login.UserName, login.Pwd)
 	} else {
+		request.GetConnection().SetIsLogin(false)
 		//登录失败
 		request.GetConnection().SendBuffMsg(comm.NewLoginRetMsg(0, 1).GetMsg())
 	}
@@ -68,21 +70,23 @@ var checkFileMutex = new(sync.Mutex)
 
 //
 func (this *CheckFileRouter) Handle(request ziface.IRequest) {
-	_, err := request.GetConnection().GetProperty("SESSION_ID")
-	if err != nil {
-		zlog.Debug("CheckFile err no login...")
+
+	if !request.GetConnection().GetIsLogin() {
+		zlog.Error("CheckFile err no login...")
 		request.GetConnection().SendBuffMsg(comm.NewCheckFileRetMsg("", 3).GetMsg())
 		return
 	}
+
 	zlog.Debug("CheckFile...")
 	checkFileMutex.Lock()
 	//校验文件
 	ckcekf := comm.NewCheckFileMsgByByte(request.GetData())
-	lockkey := fmt.Sprintf("CheckFile_%s", ckcekf.Filepaht)
+
+	lockkey := fmt.Sprintf("CheckFile_%s", ckcekf.Filepath)
 	_, ok := comm.TempMap.Get(lockkey)
 	if ok {
-		request.GetConnection().SendBuffMsg(comm.NewCheckFileRetMsg(ckcekf.Filepaht, 3).GetMsg())
-		zlog.Debug("CheckFile is lock by other", ckcekf.Filepaht)
+		request.GetConnection().SendBuffMsg(comm.NewCheckFileRetMsg(ckcekf.Filepath, 3).GetMsg())
+		zlog.Debug("CheckFile is lock by other", ckcekf.Filepath)
 		checkFileMutex.Unlock()
 		return
 	} else {
@@ -91,28 +95,28 @@ func (this *CheckFileRouter) Handle(request ziface.IRequest) {
 	}
 	checkFileMutex.Unlock()
 
-	//fp :=comm.AppendPath(comm.SyncConfigObj.BasePath,ckcekf.Filepaht)
-	fp := comm.AppendPath("/test2", ckcekf.Filepaht)
+	//文件的绝对路径
+	FileAPath := comm.AppendPath(ServerConfigObj.BasePath, ckcekf.Filepath)
 	//如果文件不存在,则上传文件
-	if hasf, _ := comm.PathExists(fp); hasf == false {
-		request.GetConnection().SendBuffMsg(comm.NewCheckFileRetMsg(ckcekf.Filepaht, 1).GetMsg())
-		zlog.Info("file not found", ckcekf.Filepaht)
+	if hasf, _ := comm.PathExists(FileAPath); hasf == false {
+		request.GetConnection().SendBuffMsg(comm.NewCheckFileRetMsg(ckcekf.Filepath, 1).GetMsg())
+		zlog.Info("file not found", ckcekf.Filepath)
 		return
 	} else {
 		//存在，则校验MD5
-		md5, err := utils.GetFileMd5(fp, ckcekf.CheckType)
+		md5, err := utils.GetFileMd5(FileAPath, ckcekf.CheckType)
 		if err != nil {
 			zlog.Error(err)
 			return
 		}
 		if bytes.Equal(md5, ckcekf.Check) {
-			zlog.Info("check file same", ckcekf.Filepaht)
-			request.GetConnection().SendBuffMsg(comm.NewCheckFileRetMsg(ckcekf.Filepaht, 2).GetMsg())
+			zlog.Info("check file same", ckcekf.Filepath)
+			request.GetConnection().SendBuffMsg(comm.NewCheckFileRetMsg(ckcekf.Filepath, 2).GetMsg())
 		} else {
 			//zlog.Debug("old md5:", fmt.Sprintf("%x",ckcekf.Check))
 			//zlog.Debug("new md5:", fmt.Sprintf("%x",md5))
-			zlog.Info("check file is different", ckcekf.Filepaht)
-			request.GetConnection().SendBuffMsg(comm.NewCheckFileRetMsg(ckcekf.Filepaht, 1).GetMsg())
+			zlog.Info("check file is different", ckcekf.Filepath)
+			request.GetConnection().SendBuffMsg(comm.NewCheckFileRetMsg(ckcekf.Filepath, 1).GetMsg())
 		}
 	}
 }
@@ -124,32 +128,32 @@ type SendFileReqRouter struct {
 
 //
 func (this *SendFileReqRouter) Handle(request ziface.IRequest) {
-	_, err := request.GetConnection().GetProperty("SESSION_ID")
-	if err != nil {
-		zlog.Debug("SendFileReq err no login...")
-		request.GetConnection().SendBuffMsg(comm.NewCheckFileRetMsg("", 3).GetMsg())
-		return
-	}
 	zlog.Debug("SendFileReq...")
 	freq := comm.NewSendFileReqMsgByByte(request.GetData())
 
-	syncf := SyncFileHandle.GetSyncFile(request.GetConnection().GetConnID(), freq.ReqId, freq.Filepaht, freq.Flen)
+	if !request.GetConnection().GetIsLogin() {
+		zlog.Error("SendFileReq err no login...")
+		request.GetConnection().SendBuffMsg(comm.NewSendFileReqRetMsg(freq.ReqId, 0, 1).GetMsg())
+		return
+	}
+
+	syncf := SyncFileHandle.GetSyncFile(request.GetConnection().GetConnID(), freq.ReqId, freq.Filepath, freq.Flen)
 	//不是同一个客户端ID，则锁住
 	if syncf.ClientId != request.GetConnection().GetConnID() {
-		zlog.Debug("SendFileReq is lock by other client", freq.Filepaht)
+		zlog.Debug("SendFileReq is lock by other client", freq.Filepath)
 		request.GetConnection().SendBuffMsg(comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 1).GetMsg())
 		return
 	}
 	//不是同一个请求，则锁住
 	if syncf.ReqId != freq.ReqId {
-		zlog.Debug("SendFileReq is lock by other thread", freq.Filepaht)
+		zlog.Debug("SendFileReq is lock by other thread", freq.Filepath)
 		request.GetConnection().SendBuffMsg(comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 1).GetMsg())
 		return
 	}
 
 	//如果文件不存在,则上传文件,同时打开文件等待接受文件数据
 	if syncf.HasFile == false {
-		zlog.Info("file not found", freq.Filepaht)
+		zlog.Info("file not found", freq.Filepath)
 		syncf.Open()
 		request.GetConnection().SendBuffMsg(comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 0).GetMsg())
 		return
@@ -163,12 +167,12 @@ func (this *SendFileReqRouter) Handle(request ziface.IRequest) {
 			return
 		}
 		if bytes.Equal(md5, freq.Check) {
-			zlog.Info("check file same", freq.Filepaht)
+			zlog.Info("check file same", freq.Filepath)
 			SyncFileHandle.RemoveSyncFile(syncf)
 			request.GetConnection().SendBuffMsg(comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 2).GetMsg())
 			return
 		} else {
-			zlog.Info("check file is different", freq.Filepaht)
+			zlog.Info("check file is different", freq.Filepath)
 			syncf.Open()
 			request.GetConnection().SendBuffMsg(comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 0).GetMsg())
 			return
@@ -186,9 +190,8 @@ type RequestRouter struct {
 func (this *RequestRouter) Handle(request ziface.IRequest) {
 	ckcekf := comm.NewRequestMsgMsgByByte(request.GetData())
 	//判断是否登录了
-	_, err := request.GetConnection().GetProperty("SESSION_ID")
-	if err != nil {
-		zlog.Debug("Request err no login...")
+	if !request.GetConnection().GetIsLogin() {
+		zlog.Error("Request err no login...")
 		request.GetConnection().SendBuffMsg(comm.NewCommRetMsg(ckcekf.SecId, 1, "用户未登录", 0, "").GetMsg())
 		return
 	}
@@ -212,22 +215,22 @@ func (this *RequestRouter) Handle(request ziface.IRequest) {
 //请求文件校验
 func (this *RequestRouter) HandleSendFileReq(request ziface.IRequest, data []byte) ziface.IMessage {
 	freq := comm.NewSendFileReqMsgByByte(data)
-	zlog.Debug("HandleSendFileReq.....", freq.Filepaht)
-	syncf := SyncFileHandle.GetSyncFile(request.GetConnection().GetConnID(), freq.ReqId, freq.Filepaht, freq.Flen)
+	zlog.Debug("HandleSendFileReq.....", freq.Filepath)
+	syncf := SyncFileHandle.GetSyncFile(request.GetConnection().GetConnID(), freq.ReqId, freq.Filepath, freq.Flen)
 	//不是同一个客户端ID，则锁住
 	if syncf.ClientId != request.GetConnection().GetConnID() {
-		zlog.Debug("SendFileReq is lock by other client", freq.Filepaht)
+		zlog.Debug("SendFileReq is lock by other client", freq.Filepath)
 		return comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 1).GetMsg()
 	}
 	//不是同一个请求，则锁住
 	if syncf.ReqId != freq.ReqId {
-		zlog.Debug("SendFileReq is lock by other thread", freq.Filepaht)
+		zlog.Debug("SendFileReq is lock by other thread", freq.Filepath)
 		return comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 1).GetMsg()
 	}
 
 	//如果文件不存在,则上传文件,同时打开文件等待接受文件数据
 	if syncf.HasFile == false {
-		zlog.Info("file not found", freq.Filepaht)
+		zlog.Info("file not found", freq.Filepath)
 		syncf.Open()
 		return comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 0).GetMsg()
 	} else {
@@ -239,11 +242,11 @@ func (this *RequestRouter) HandleSendFileReq(request ziface.IRequest, data []byt
 			return comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 1).GetMsg()
 		}
 		if bytes.Equal(md5, freq.Check) {
-			zlog.Info("check file same", freq.Filepaht)
+			zlog.Info("check file same", freq.Filepath)
 			SyncFileHandle.RemoveSyncFile(syncf)
 			return comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 2).GetMsg()
 		} else {
-			zlog.Info("check file is different", freq.Filepaht)
+			zlog.Info("check file is different", freq.Filepath)
 			syncf.Open()
 			return comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 0).GetMsg()
 		}
@@ -260,9 +263,8 @@ func (this *SendFileMsgRouter) Handle(request ziface.IRequest) {
 	zlog.Debug("SendFileMsg...")
 	sf := comm.NewSendFileMsgByByte(request.GetData())
 	//判断是否登录了
-	_, err := request.GetConnection().GetProperty("SESSION_ID")
-	if err != nil {
-		zlog.Debug("Request err no login...")
+	if !request.GetConnection().GetIsLogin() {
+		zlog.Error("SendFile err no login...")
 		request.GetConnection().SendBuffMsg(comm.NewCommRetMsg(sf.SecId, 1, "用户未登录", 0, "").GetMsg())
 		return
 	}
@@ -306,15 +308,17 @@ type DeleteFileRouter struct {
 func (this *DeleteFileRouter) Handle(request ziface.IRequest) {
 	zlog.Debug("DeleteFileMsg...")
 	sf := comm.NewDeleteFileReqMsgByByte(request.GetData())
+
 	//判断是否登录了
-	_, err := request.GetConnection().GetProperty("SESSION_ID")
-	if err != nil {
-		zlog.Debug("Request err no login...")
+	if !request.GetConnection().GetIsLogin() {
+		zlog.Error("DeleteFile err no login...")
 		request.GetConnection().SendBuffMsg(comm.NewCommRetMsg(sf.SecId, 1, "用户未登录", 0, "").GetMsg())
 		return
 	}
+	//文件的绝对路径
+	FileAPath := comm.AppendPath(ServerConfigObj.BasePath, sf.Filepath)
 	//删除文件
-	err = os.Remove(sf.Filepath)
+	err := os.Remove(FileAPath)
 
 	if err != nil {
 		// 删除失败
@@ -334,17 +338,17 @@ type MoveFileRouter struct {
 func (this *MoveFileRouter) Handle(request ziface.IRequest) {
 	zlog.Debug("MoveFileMsg...")
 	sf := comm.NewMoveFileReqMsgByByte(request.GetData())
-
 	//判断是否登录了
-	_, err := request.GetConnection().GetProperty("SESSION_ID")
-	if err != nil {
-		zlog.Debug("Request err no login...")
+	if !request.GetConnection().GetIsLogin() {
+		zlog.Error("MoveFile err no login...")
 		request.GetConnection().SendBuffMsg(comm.NewCommRetMsg(sf.SecId, 1, "用户未登录", 0, "").GetMsg())
 		return
 	}
-
+	//文件的绝对路径
+	srcFileAPath := comm.AppendPath(ServerConfigObj.BasePath, sf.SrcFilepath)
+	dstFileAPath := comm.AppendPath(ServerConfigObj.BasePath, sf.DstFilepath)
 	//判断文件/目录是否存在
-	files, err := os.Stat(sf.SrcFilepath)
+	files, err := os.Stat(srcFileAPath)
 	if err != nil {
 		// 移动失败
 		request.GetConnection().SendBuffMsg(comm.NewCommRetMsg(sf.SecId, 1, "移动失败", 0, "").GetMsg())
@@ -353,11 +357,11 @@ func (this *MoveFileRouter) Handle(request ziface.IRequest) {
 
 	//如果是文件夹，递归调用
 	if files.IsDir() {
-		err = this.copyDir(sf.SrcFilepath, sf.DstFilepath)
+		err = this.copyDir(srcFileAPath, dstFileAPath)
 	} else {
 		//先创建目录，再复制
-		os.MkdirAll(sf.DstFilepath[:strings.LastIndex(sf.DstFilepath, "/")], os.ModePerm)
-		err = this.copyFile(sf.SrcFilepath, sf.DstFilepath)
+		os.MkdirAll(dstFileAPath[:strings.LastIndex(dstFileAPath, "/")], os.ModePerm)
+		err = this.copyFile(srcFileAPath, dstFileAPath)
 	}
 	if err != nil {
 		// 移动失败
@@ -367,7 +371,7 @@ func (this *MoveFileRouter) Handle(request ziface.IRequest) {
 		request.GetConnection().SendBuffMsg(comm.NewCommRetMsg(sf.SecId, 0, "", 0, "").GetMsg())
 		//如果是move 则删除源
 		if sf.OpType == 1 {
-			os.Remove(sf.SrcFilepath)
+			os.Remove(srcFileAPath)
 		}
 	}
 }
