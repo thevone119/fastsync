@@ -41,6 +41,8 @@ type NetWork struct {
 	requestChanLock chan bool
 	requestChan     []chan *comm.ResponseMsg //request的管道，10个管道并发
 
+	dataPack *znet.DataPack //数据封包处理类，避免每次都实例化
+
 	secId      uint32
 	secIdMutex sync.Mutex
 }
@@ -60,6 +62,7 @@ func NewNetWork(ip string, port int, username string, password string) *NetWork 
 		TimeOutTime:     0,
 		TimeConnected:   0,
 		Conn:            nil,
+		dataPack:        znet.NewDataPack(),
 		receiveCallBack: make(map[uint32]func(ziface.IMessage)),
 		requestChanLock: make(chan bool, 10),
 		requestChan:     make([]chan *comm.ResponseMsg, 10),
@@ -135,7 +138,6 @@ func (n *NetWork) process() {
 			}
 		}
 	}
-
 }
 
 //把数据放入待发送队列
@@ -144,9 +146,11 @@ func (n *NetWork) Enqueue(msg ziface.IMessage) {
 }
 
 func (n *NetWork) SendData(msg ziface.IMessage) {
-	dp := znet.NewDataPack()
+	if !n.Connected {
+		return
+	}
 	//有数据要发送
-	_d, _ := dp.Pack(msg)
+	_d, _ := n.dataPack.Pack(msg)
 	if _, err := n.Conn.Write(_d); err != nil {
 		zlog.Error("Send Data error:, ", err, " Conn Writer exit")
 		return
@@ -155,14 +159,12 @@ func (n *NetWork) SendData(msg ziface.IMessage) {
 
 //go线程调用
 func (n *NetWork) gosendData() {
-	//发封包message消息
-	dp := znet.NewDataPack()
 	for {
 		select {
 		case data, ok := <-n.sendMsgs:
 			if ok {
 				//有数据要发送
-				_d, _ := dp.Pack(data)
+				_d, _ := n.dataPack.Pack(data)
 				if _, err := n.Conn.Write(_d); err != nil {
 					zlog.Error("Send Buff Data error:, ", err, " Conn Writer exit")
 					return
