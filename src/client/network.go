@@ -32,6 +32,7 @@ type NetWork struct {
 	Conn          net.Conn
 	TimeOutTime   int64
 	TimeConnected int64
+	ConnSussTime  int64 //连接成功时间
 	//是否已登录
 	Login bool
 
@@ -84,7 +85,7 @@ func NewNetWork(ip string, port int, username string, password string) *NetWork 
 //连接网络
 func (n *NetWork) connect() {
 	n.TimeConnected = time.Now().Unix()
-	n.TimeOutTime = time.Now().Unix()
+	n.TimeOutTime = n.TimeConnected
 	adder := fmt.Sprintf("%s:%d", n.IP, n.Port)
 	fmt.Println("connect to:", adder)
 	conn, err := net.DialTimeout("tcp", adder, time.Duration(3)*time.Second)
@@ -98,7 +99,7 @@ func (n *NetWork) connect() {
 	fmt.Println("NetWork Connect succ!", n.IP)
 	n.Conn = conn
 	n.Connected = true
-
+	n.ConnSussTime = n.TimeConnected
 	//开启读写线程
 	go n.receiveData()
 	go n.gosendData()
@@ -287,6 +288,9 @@ func (n *NetWork) Request(msg ziface.IMessage) ([]byte, error) {
 		select {
 		case data, ok := <-n.requestChan[_secId%10]:
 			if ok {
+				if data.SecId != _secId {
+					break
+				}
 				return data.Data, nil
 			}
 		case <-time.After(time.Duration(10) * time.Second):

@@ -318,7 +318,7 @@ func (m *SendFileReqMsg) GetMsg() ziface.IMessage {
 	return znet.NewMsgPackage(MID_SendFileReq, bytesBuffer.Bytes())
 }
 
-//6.SendFileReqRetMsg 发送上传文件请求，返回
+//-------------------------------------------------------------SendFileReqRetMsg 发送上传文件请求，返回
 type SendFileReqRetMsg struct {
 	ReqId   uint32 //请求的ID
 	RetId   uint32 //返回的ID

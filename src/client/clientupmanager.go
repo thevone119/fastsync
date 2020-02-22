@@ -1,7 +1,6 @@
 package client
 
 import (
-	"fmt"
 	"io/ioutil"
 	"strconv"
 	"strings"
@@ -60,20 +59,24 @@ func (c *ClientUpManager) SyncPath(lp string) {
 			continue
 		} else {
 			fullName := lp + "/" + fi.Name()
-			c.SyncFile(fullName)
+			c.SyncFile(fullName, 3)
 		}
 	}
 }
 
 //同步某个文件到服务器,本机文件新增，修改的时候，就调用这个方法
-func (c *ClientUpManager) SyncFile(lp string) {
-
-	for _, fu := range c.RemoteUpLoad {
-		rp := lp[strings.Index(lp, ClientConfigObj.BasePath)+len(ClientConfigObj.BasePath):]
-		fu.SyncFile(lp, rp)
+//cktype:文件的校验类型
+func (c *ClientUpManager) SyncFile(lp string, cktype byte) {
+	zlog.Debug("SyncFile..", lp)
+	//1.读取判断本地文件是否存在，大小，MD5等
+	rlp, err := ClientConfigObj.GetRelativePath(lp)
+	if err != nil {
+		zlog.Error("SyncFile..err,path:", lp)
 	}
-	fmt.Println("SyncFile..", lp)
-	c.SecId++
+	ul := NewLocalFile(lp, rlp, cktype)
+	for _, fu := range c.RemoteUpLoad {
+		fu.SendUpload(ul)
+	}
 }
 
 //删除服务器中的某个文件,包括文件夹
