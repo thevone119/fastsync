@@ -2,7 +2,6 @@ package client
 
 import (
 	"comm"
-	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -16,15 +15,18 @@ import (
 //每个远程链接对应一个这样的类，保持长链接的文件传输处理
 
 type FileUpload struct {
-	netclient *NetWork        //网络连接类，保持长连接
-	timeout   int64           //超时时间，秒
-	RPath     string          //远端服务器的路径
-	sendEnd   map[uint32]bool //
+	netclient *NetWork //网络连接类，保持长连接
+	timeout   int64    //超时时间，秒
+	RPath     string   //远端服务器的路径
 
 	upLoads chan *LocalFile //上传文件的管道 10
 
-	//请求上传文件的管道，接受返回
-	sendFileReqRetChan chan *SendFileReqRetMsg
+	//请求上传文件的管道，接受返回 2
+	sendFileReqRetChan chan *comm.SendFileReqRetMsg
+
+	//单文件上传
+	sendFileState byte   //文件上传的状态记录 0:未开始 1：正在上传  2： 上传完成 3：上传错误
+	sendFilePath  string //正在传送的文件名称记录
 
 	secId uint32
 }
@@ -34,9 +36,8 @@ func NewFileUpload(nc *NetWork, to int64, fp string) *FileUpload {
 		netclient:          nc,
 		timeout:            to,
 		RPath:              fp,
-		sendEnd:            make(map[uint32]bool),
 		upLoads:            make(chan *LocalFile, 10),
-		sendFileReqRetChan: make(chan *SendFileReqRetMsg, 2),
+		sendFileReqRetChan: make(chan *comm.SendFileReqRetMsg, 2),
 		secId:              0,
 	}
 	//注册一些方法哦
@@ -68,7 +69,7 @@ func (n *FileUpload) goupLoadProcess() {
 	}
 }
 
-//管道上传
+//管道上传，单线程
 func (n *FileUpload) doUploadChan(l *LocalFile) {
 	if n.secId >= math.MaxUint32 {
 		n.secId = 1
@@ -76,25 +77,63 @@ func (n *FileUpload) doUploadChan(l *LocalFile) {
 	n.secId++
 	_secId := n.secId
 
+	//这里要做个判断，判断客户端连接是否超时，如果客户端超过5秒没连接了，这个直接就失败了。某个客户端没连接，柱塞所有的任务
+
 	//1.同步请求，请求服务器，看是否需要上传，如果需要上传
 	n.netclient.SendData(comm.NewSendFileReqMsg(_secId, l.Flen, l.FileMd5, l.cktype, 1, l.RPath).GetMsg())
 
 	//2.柱塞等待返回，10秒超时
 	for {
 		select {
-		case data, ok := <-n.requestChan[_secId%10]:
+		case data, ok := <-n.sendFileReqRetChan:
 			if ok {
-				if data.SecId != _secId {
+				if data.ReqId != _secId {
 					break
 				}
-				return data.Data, nil
+				//返回了请求
+				if data.RetCode == 0 {
+					//可以上传，上传文件
+					n.doUploadChan2(data.RetId, l)
+				}
+				return
 			}
 		case <-time.After(time.Duration(10) * time.Second):
-			return nil, errors.New("request time out")
+			//超时了，这里做个处理
+			n.logUploadError(l.LPath, "校验文件上传超时")
+			return
 		}
 	}
+}
 
-	retb, err := n.netclient.Request(comm.NewSendFileReqMsg(_secId, l.Flen, l.FileMd5, l.cktype, 1, l.RPath).GetMsg())
+//管道上传2，第2步，正式上传文件，单线程
+func (n *FileUpload) doUploadChan2(fh uint32, l *LocalFile) {
+	//一次性传送4K
+	buff := make([]byte, 4096)
+	var start = int64(0)
+
+	n.sendFileState = 1
+	n.sendFilePath = l.LPath
+
+	for {
+		rn, err := l.Read(start, buff)
+		if err != nil && err != io.EOF {
+			n.logUploadError(l.LPath, "文件上传失败，读取文件异常")
+			return
+		}
+		if rn <= 0 {
+			break
+		}
+		//发送
+		n.netclient.Enqueue(comm.NewSendFileMsg(0, fh, start, buff[:rn]).GetMsg())
+		start += int64(rn)
+		//发送过程中，如果已经返回错误了。则直接退出哦
+
+		if n.sendFileState == 3 {
+			n.logUploadError(l.LPath, "文件上中断")
+			break
+		}
+	}
+	n.sendFileState = 2
 }
 
 /**
@@ -102,7 +141,7 @@ func (n *FileUpload) doUploadChan(l *LocalFile) {
 
 callback:-1:未知异常
 */
-func (n *FileUpload) Upload(lp string, rp string, checktype byte, callback func(byte)) {
+func (n *FileUpload) Upload_back(lp string, rp string, checktype byte, callback func(byte)) {
 	//1.开启上传文件请求通道
 	md5, err := utils.GetFileMd5(lp, checktype)
 	if err != nil {
@@ -131,7 +170,7 @@ func (n *FileUpload) Upload(lp string, rp string, checktype byte, callback func(
 	fmt.Println("ret:", reqret.RetId)
 	if reqret.RetCode == 0 {
 		//可以上传，上传文件
-		n.doUpload(lp, reqret.RetId, callback)
+		n.doUpload_back(lp, reqret.RetId, callback)
 	}
 	if reqret.RetCode == 1 {
 		callback(100)
@@ -147,7 +186,7 @@ func (n *FileUpload) Upload(lp string, rp string, checktype byte, callback func(
 
 //上传文件
 //支持续点上传
-func (n *FileUpload) doUpload(lp string, fh uint32, callback func(byte)) {
+func (n *FileUpload) doUpload_back(lp string, fh uint32, callback func(byte)) {
 	fi, err := os.Open(lp)
 	if err != nil {
 		callback(100)
@@ -171,15 +210,20 @@ func (n *FileUpload) doUpload(lp string, fh uint32, callback func(byte)) {
 		n.netclient.Enqueue(comm.NewSendFileMsg(0, fh, start, buff[:rn]).GetMsg())
 		start += int64(rn)
 	}
-	n.sendEnd[fh] = true
+
 	callback(1)
 }
 
 //发送文件块返回哦,返回上传完整，则记录成功，否则记录失败之类的
 //这里做日志记录处理的
 func (n *FileUpload) doSendFileRet(msg ziface.IMessage) {
-	//sret :=comm.NewSendFileRetMsgByByte(msg.GetData())
-
+	sret := comm.NewSendFileRetMsgByByte(msg.GetData())
+	if sret.RetCode == 2 {
+		if n.sendFileState == 1 {
+			n.sendFileState = 3
+			n.logUploadError(n.sendFilePath, "文件上传错误")
+		}
+	}
 }
 
 //发送文件上传请求的返回
@@ -202,4 +246,14 @@ func (n *FileUpload) CopyFile(srcrp string, dstrp string) {
 //移动文件 ，包括文件夹
 func (n *FileUpload) MoveFile(srcrp string, dstrp string) {
 	n.netclient.Enqueue(comm.NewMoveFileReqMsg(0, 1, comm.AppendPath(n.RPath, srcrp), comm.AppendPath(n.RPath, dstrp)).GetMsg())
+}
+
+//记录上传成功记录
+func (n *FileUpload) logUploadSuss(lp string, msg string) {
+
+}
+
+//记录上传失败记录
+func (n *FileUpload) logUploadError(lp string, msg string) {
+
 }

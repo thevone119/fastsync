@@ -4,6 +4,7 @@ import (
 	"comm"
 	"fmt"
 	"server"
+	"time"
 	"zinx/ziface"
 	"zinx/znet"
 )
@@ -45,7 +46,20 @@ func main() {
 	//配置路由,复制文件，移动文件，文件夹
 	s.AddRouter(comm.MID_MoveFileReq, &server.MoveFileRouter{})
 
+	//这里开启一个定时任务，做一些数据清理
+	go goTimingTask()
+
 	//开启服务
 	s.Serve()
 
+}
+
+//定时任务，5秒执行一次哦,协程处理
+func goTimingTask() {
+	for {
+		time.Sleep(time.Second * 5)
+		//清理文件SyncFileHandle
+		server.SyncFileHandle.ClearTimeout()
+
+	}
 }

@@ -11,15 +11,17 @@ import (
 
 //全局对象
 var SyncFileHandle = &syncFileHandle{
-	fmap:  make(map[string]*SyncFile),
-	fhmap: make(map[uint32]*SyncFile),
+	fmap:          make(map[string]*SyncFile),
+	fhmap:         make(map[uint32]*SyncFile),
+	nextClearTime: 0,
 }
 
 //实现文件写入锁，同一个时间，一个文件只允许一个客户端进行写入操作
 type syncFileHandle struct {
-	fmap  map[string]*SyncFile //filemap
-	fhmap map[uint32]*SyncFile //filemap
-	flock sync.RWMutex         //读写锁
+	fmap          map[string]*SyncFile //filemap
+	fhmap         map[uint32]*SyncFile //filemap
+	nextClearTime int64                //下次清理时间
+	flock         sync.RWMutex         //读写锁
 }
 
 func (s *syncFileHandle) GetSyncFile(cid uint32, reqid uint32, fp string, flen int64) *SyncFile {
@@ -61,6 +63,25 @@ func (s *syncFileHandle) CloseAll(cid uint32) {
 		v.Close()
 		delete(s.fhmap, v.FileId)
 		delete(s.fmap, k)
+	}
+}
+
+//定时清理，每5分钟清理一次哦，超过5分钟没有操作的文件，则关闭文件
+func (s *syncFileHandle) ClearTimeout() {
+	ct := time.Now().Unix()
+	if ct > s.nextClearTime {
+		s.nextClearTime = ct + 60*5
+		//清理
+		s.flock.Lock()
+		defer s.flock.Unlock()
+		clearTime := ct - 60*5
+		for k, v := range s.fmap {
+			if v.LastTime < clearTime {
+				v.Close()
+				delete(s.fhmap, v.FileId)
+				delete(s.fmap, k)
+			}
+		}
 	}
 }
 

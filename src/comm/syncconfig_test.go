@@ -16,6 +16,10 @@ func TestSyncConfig(t *testing.T) {
 	}
 	fmt.Println(s[:strings.LastIndex(s, "/")])
 
+	by := make([]byte, 10)
+	by2 := by[0:10]
+	fmt.Println("blen:", len(by2))
+
 	os.MkdirAll("d:/test/ttttt/ttttt/", os.ModePerm)
 	if os.IsNotExist(err) {
 
