@@ -78,6 +78,7 @@ func NewNetWork(ip string, port int, username string, password string) *NetWork 
 	n.AddCallBack(comm.MID_LoginRet, n.doLoginRet)
 	n.AddCallBack(comm.MID_Response, n.doResponse)
 	//启动线程做自处理，保持会话，链接
+	n.connect()
 	go n.process()
 	return &n
 }
