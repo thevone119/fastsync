@@ -9,6 +9,12 @@ import (
 	"utils"
 )
 
+//全局对象
+var SyncFileHandle = &syncFileHandle{
+	fmap:  make(map[string]*SyncFile),
+	fhmap: make(map[uint32]*SyncFile),
+}
+
 //实现文件写入锁，同一个时间，一个文件只允许一个客户端进行写入操作
 type syncFileHandle struct {
 	fmap  map[string]*SyncFile //filemap
@@ -58,12 +64,6 @@ func (s *syncFileHandle) CloseAll(cid uint32) {
 	}
 }
 
-//全局对象
-var SyncFileHandle = &syncFileHandle{
-	fmap:  make(map[string]*SyncFile),
-	fhmap: make(map[uint32]*SyncFile),
-}
-
 //同步文件处理
 type SyncFile struct {
 	ClientId uint32   //客户端ID，不同客户端，不运行同占一个文件
@@ -79,6 +79,7 @@ type SyncFile struct {
 	//
 	LastTime int64 //最后修改时间
 
+	FlastModTime int64 //文件的最后修改时间
 	//
 	WriteLen int64        //已写入文件的长度，当写入文件长度等于文件长度时，写入完整
 	flock    sync.RWMutex //读写锁
@@ -159,5 +160,6 @@ func (this *SyncFile) Close() {
 	this.FOpen = false
 	if this.FH != nil {
 		this.FH.Close()
+		this.FH = nil
 	}
 }
