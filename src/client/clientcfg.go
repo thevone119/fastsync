@@ -3,8 +3,10 @@ package client
 import (
 	"comm"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
+	"strings"
 )
 
 //客户端配置
@@ -30,12 +32,12 @@ func init() {
 	}
 
 	//从配置文件中加载一些用户配置的参数
-	ClientConfigObj.Reload()
+	ClientConfigObj.reload()
 	fmt.Println("SyncConfig load BasePath:", ClientConfigObj.BasePath, "RemotePath len:", len(ClientConfigObj.RemotePath))
 }
 
 //读取用户的配置文件
-func (g *clientConfig) Reload() {
+func (g *clientConfig) reload() {
 
 	if confFileExists, _ := comm.PathExists(g.ConfFilePath); confFileExists != true {
 		//fmt.Println("Config File ", g.ConfFilePath , " is not exist!!")
@@ -48,5 +50,13 @@ func (g *clientConfig) Reload() {
 	}
 	//将json数据解析到struct中
 	err = json.Unmarshal(data, g)
+}
 
+//根据绝对路径，获取相对路径
+func (g *clientConfig) GetRelativePath(lp string) (string, error) {
+	if strings.Index(lp, g.BasePath) != 0 {
+		return "", errors.New("path err:" + lp)
+	}
+
+	return lp[len(g.BasePath):], nil
 }

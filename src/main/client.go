@@ -2,11 +2,9 @@ package main
 
 import (
 	"client"
-	"comm"
 	"fmt"
 	"os"
 	"time"
-	"utils"
 )
 
 func main() {
@@ -23,24 +21,4 @@ func main() {
 	fmt.Println("start...,pwd:", p)
 
 	select {}
-}
-
-//客户端主程序，无限循环处理
-func Process() {
-
-}
-
-//校验某个文件是否需要上传
-func checkfile(c *client.NetWork, fp string, ct byte) {
-	fmt.Println("fp:", comm.AppendPath(comm.SyncConfigObj.BasePath, fp))
-	md5, err := utils.GetFileMd5(comm.AppendPath(comm.SyncConfigObj.BasePath, fp), ct)
-	if err != nil {
-		fmt.Println("err")
-	} else {
-		c.Enqueue(comm.NewCheckFileMsg(fp, md5, ct).GetMsg())
-	}
-}
-
-func callback(ret byte) {
-
 }
