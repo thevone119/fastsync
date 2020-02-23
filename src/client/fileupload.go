@@ -80,7 +80,7 @@ func (n *FileUpload) doUploadChan(l *LocalFile) {
 
 	//这里要做个判断，判断客户端是否活动，如果不在活动中，这个直接就失败了。避免某个客户端连接不上，柱塞所有的任务
 	if !n.netclient.IsActivity() {
-		n.logUploadError(l.LPath, "校验文件上传超时")
+		n.logUploadError(l.LPath, "服务器连接异常")
 		return
 	}
 	//1.同步请求，请求服务器，看是否需要上传，如果需要上传

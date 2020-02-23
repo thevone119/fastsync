@@ -32,7 +32,8 @@ type NetWork struct {
 	Conn          net.Conn
 	TimeOutTime   int64
 	TimeConnected int64
-	ConnSussTime  int64 //连接成功时间
+	ActivityTime  int64 //活动时间，存活时间，如果超过5秒没有活动了。则认为这个连接有问题了哦
+	CurrTime      int64 //当前的时间，秒，每秒循环，更新这个时间
 	//是否已登录
 	Login bool
 
@@ -62,6 +63,7 @@ func NewNetWork(ip string, port int, username string, password string) *NetWork 
 		receive:         make(chan ziface.IMessage, 1024),
 		TimeOutTime:     0,
 		TimeConnected:   0,
+		ActivityTime:    0,
 		Conn:            nil,
 		dataPack:        znet.NewDataPack(),
 		receiveCallBack: make(map[uint32]func(ziface.IMessage)),
@@ -100,7 +102,7 @@ func (n *NetWork) connect() {
 	fmt.Println("NetWork Connect succ!", n.IP)
 	n.Conn = conn
 	n.Connected = true
-	n.ConnSussTime = n.TimeConnected
+	n.ActivityTime = n.TimeConnected
 	//开启读写线程
 	go n.receiveData()
 	go n.gosendData()
@@ -123,20 +125,20 @@ func (n *NetWork) process() {
 	}
 	ticker := time.NewTicker(1 * time.Second)
 	for {
-		currtime := time.Now().Unix()
 		select {
 		case <-ticker.C:
+			n.CurrTime = time.Now().Unix()
 			//超过5秒没有连接上，则再次发起连接？
-			if !n.Connected && currtime > n.TimeConnected+5 {
+			if !n.Connected && n.CurrTime > n.TimeConnected+5 {
 				n.connect()
 			}
 			if n.Connected == false {
 				continue
 			}
 			//超时发送心跳包？每10秒发送一个？心跳包是空的？
-			if n.Connected && currtime > n.TimeOutTime {
-				n.TimeOutTime = currtime + 5
-				n.Enqueue(comm.NewKeepAliveMsg(time.Now().Unix()).GetMsg())
+			if n.Connected && n.CurrTime > n.TimeOutTime {
+				n.TimeOutTime = n.CurrTime + 5
+				n.Enqueue(comm.NewKeepAliveMsg(n.CurrTime).GetMsg())
 			}
 		}
 	}
@@ -188,6 +190,8 @@ func (n *NetWork) receiveData() {
 		if n.Connected == false {
 			return
 		}
+		//活动时间
+		n.ActivityTime = n.CurrTime
 		//发封包message消息
 		dp := znet.NewDataPack()
 
@@ -221,6 +225,14 @@ func (n *NetWork) receiveData() {
 			n.doReceiveData(msg)
 		}
 	}
+}
+
+//是否活动中（超过10秒没有活动，则认为没有活动了）
+func (n *NetWork) IsActivity() bool {
+	if n.ActivityTime+10 <= n.CurrTime {
+		return false
+	}
+	return true
 }
 
 func (n *NetWork) AddCallBack(msgid uint32, cb func(ziface.IMessage)) {
