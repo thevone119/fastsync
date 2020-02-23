@@ -236,9 +236,13 @@ func (n *NetWork) receiveData() {
 
 //是否活动中（超过10秒没有活动，则认为没有活动了）
 func (n *NetWork) IsActivity() bool {
+	if !n.Connected {
+		return false
+	}
 	if n.ActivityTime+10 <= n.CurrTime {
 		return false
 	}
+
 	return true
 }
 
