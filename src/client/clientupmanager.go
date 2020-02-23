@@ -49,8 +49,8 @@ func srtToFileUpload(str string) *FileUpload {
 
 //同步某个目录到服务器中去/包括目录下的所有文件
 func (c *ClientUpManager) SyncPath(lp string) {
-	if strings.Index(lp, "/") == 0 {
-		lp = lp[1:]
+	if strings.LastIndex(lp, "/") == len(lp)-1 && len(lp) > 0 {
+		lp = lp[0 : len(lp)-1]
 	}
 	rd, err := ioutil.ReadDir(lp)
 	if err != nil {

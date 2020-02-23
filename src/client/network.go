@@ -60,7 +60,7 @@ func NewNetWork(ip string, port int, username string, password string) *NetWork 
 		Login:           false,
 		ExitBuffChan:    make(chan bool, 1),
 		sendMsgs:        make(chan ziface.IMessage, 100), //缓存100个数据包 每个4K算的话，就是8M缓存
-		receive:         make(chan ziface.IMessage, 1024),
+		receive:         make(chan ziface.IMessage, 100),
 		TimeOutTime:     0,
 		TimeConnected:   0,
 		ActivityTime:    0,
@@ -96,13 +96,16 @@ func (n *NetWork) connect() {
 		fmt.Println("NetWork Connect err!", adder)
 		return
 	}
-	//登录认证
-	n.Enqueue(comm.NewLoginMsg(n.UserName, n.PassWord).GetMsg())
-
+	//这里才重新开启管道哦
+	n.sendMsgs = make(chan ziface.IMessage, 100)
+	n.receive = make(chan ziface.IMessage, 100)
 	fmt.Println("NetWork Connect succ!", n.IP)
 	n.Conn = conn
 	n.Connected = true
 	n.ActivityTime = n.TimeConnected
+	//登录认证
+	n.Enqueue(comm.NewLoginMsg(n.UserName, n.PassWord).GetMsg())
+
 	//开启读写线程
 	go n.receiveData()
 	go n.gosendData()
@@ -114,8 +117,10 @@ func (n *NetWork) Disconnect() {
 	n.Login = false
 	n.ExitBuffChan <- true
 	n.Conn.Close()
-	//close(n.SendMsgs)
-	//close(n.Receive)
+
+	//关闭管道
+	close(n.sendMsgs)
+	close(n.receive)
 }
 
 //死循环处理,主线程死循环调用,每秒循环调用
@@ -146,7 +151,9 @@ func (n *NetWork) process() {
 
 //把数据放入待发送队列
 func (n *NetWork) Enqueue(msg ziface.IMessage) {
-	n.sendMsgs <- msg
+	if n.Connected {
+		n.sendMsgs <- msg
+	}
 }
 
 func (n *NetWork) SendData(msg ziface.IMessage) {
