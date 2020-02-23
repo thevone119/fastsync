@@ -140,12 +140,12 @@ func (m *LoginRetMsg) GetMsg() ziface.IMessage {
 //4.CheckFileMsg
 type CheckFileMsg struct {
 	MessageUtils
-	Filepath  string //校验文件路径
-	Check     []byte //校验文件MD5（16 byte）
-	CheckType byte   //校验文件类型 0:不校验  1:size校验 2:fastmd5 3:fullmd5
+	Filepath  string        //校验文件路径
+	Check     []byte        //校验文件MD5（16 byte）
+	CheckType CheckFileType //校验文件类型 0:不校验  1:size校验 2:fastmd5 3:fullmd5
 }
 
-func NewCheckFileMsg(fp string, ck []byte, ct byte) *CheckFileMsg {
+func NewCheckFileMsg(fp string, ck []byte, ct CheckFileType) *CheckFileMsg {
 	return &CheckFileMsg{
 		Filepath:  fp,
 		Check:     ck,
@@ -160,7 +160,8 @@ func NewCheckFileMsgByByte(b []byte) *CheckFileMsg {
 	c.Filepath = m.ReadString(bytesBuffer)
 	c.Check = make([]byte, 16)
 	bytesBuffer.Read(c.Check)
-	c.CheckType, _ = bytesBuffer.ReadByte()
+	ct, _ := bytesBuffer.ReadByte()
+	c.CheckType = CheckFileType(ct)
 	return &c
 }
 
@@ -168,7 +169,7 @@ func (m *CheckFileMsg) GetMsg() ziface.IMessage {
 	bytesBuffer := bytes.NewBuffer([]byte{})
 	m.WriteString(bytesBuffer, m.Filepath)
 	bytesBuffer.Write(m.Check)
-	bytesBuffer.WriteByte(m.CheckType)
+	bytesBuffer.WriteByte(byte(m.CheckType))
 
 	return znet.NewMsgPackage(MID_CheckFile, bytesBuffer.Bytes())
 }
@@ -274,22 +275,24 @@ func (m *CheckFileRetMsg) GetMsg() ziface.IMessage {
 //----------------------------------------------------------------------------------------MID_SendFileReq 发送上传文件请求
 type SendFileReqMsg struct {
 	MessageUtils
-	ReqId     uint32 //请求的ID
-	Flen      int64  //文件大小
-	Check     []byte //校验文件MD5（16 byte）
-	CheckType byte   //校验文件类型 0:不校验  1:size校验 2:fastmd5 3:fullmd5
-	IsUpload  byte   //是否开启上传通道
-	Filepath  string //目标文件路径
+	ReqId        uint32        //请求的ID
+	Flen         int64         //文件大小
+	FlastModTime int64         //文件的最后修改时间,秒
+	Check        []byte        //校验文件MD5（16 byte）
+	CheckType    CheckFileType //校验文件类型 0:不校验  1:size校验 2:fastmd5 3:fullmd5
+	IsUpload     byte          //是否开启上传通道
+	Filepath     string        //目标文件路径
 }
 
-func NewSendFileReqMsg(reqid uint32, fl int64, cbyte []byte, ctype byte, isupload byte, fp string) *SendFileReqMsg {
+func NewSendFileReqMsg(reqid uint32, fl int64, modtime int64, cbyte []byte, ctype CheckFileType, isupload byte, fp string) *SendFileReqMsg {
 	return &SendFileReqMsg{
-		ReqId:     reqid,
-		Flen:      fl,
-		Check:     cbyte,
-		CheckType: ctype,
-		IsUpload:  isupload,
-		Filepath:  fp,
+		ReqId:        reqid,
+		Flen:         fl,
+		FlastModTime: modtime,
+		Check:        cbyte,
+		CheckType:    ctype,
+		IsUpload:     isupload,
+		Filepath:     fp,
 	}
 }
 
@@ -299,9 +302,12 @@ func NewSendFileReqMsgByByte(b []byte) *SendFileReqMsg {
 	var c SendFileReqMsg
 	binary.Read(bytesBuffer, binary.BigEndian, &c.ReqId)
 	binary.Read(bytesBuffer, binary.BigEndian, &c.Flen)
+	binary.Read(bytesBuffer, binary.BigEndian, &c.FlastModTime)
+
 	c.Check = make([]byte, 16)
 	bytesBuffer.Read(c.Check)
-	c.CheckType, _ = bytesBuffer.ReadByte()
+	ct, _ := bytesBuffer.ReadByte()
+	c.CheckType = CheckFileType(ct)
 	c.IsUpload, _ = bytesBuffer.ReadByte()
 	c.Filepath = m.ReadString(bytesBuffer)
 	return &c
@@ -311,8 +317,9 @@ func (m *SendFileReqMsg) GetMsg() ziface.IMessage {
 	bytesBuffer := bytes.NewBuffer([]byte{})
 	binary.Write(bytesBuffer, binary.BigEndian, m.ReqId)
 	binary.Write(bytesBuffer, binary.BigEndian, m.Flen)
+	binary.Write(bytesBuffer, binary.BigEndian, m.FlastModTime)
 	bytesBuffer.Write(m.Check)
-	bytesBuffer.WriteByte(m.CheckType)
+	bytesBuffer.WriteByte(byte(m.CheckType))
 	bytesBuffer.WriteByte(m.IsUpload)
 	m.WriteString(bytesBuffer, m.Filepath)
 	return znet.NewMsgPackage(MID_SendFileReq, bytesBuffer.Bytes())

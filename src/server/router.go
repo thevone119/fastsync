@@ -53,9 +53,10 @@ func (this *LoginRouter) Handle(request ziface.IRequest) {
 		request.GetConnection().SetProperty("USER_NAME", login.UserName)
 		//登录成功
 		request.GetConnection().SendBuffMsg(comm.NewLoginRetMsg(uid, 0).GetMsg())
-		zlog.Info("Login suss...", login.UserName, login.Pwd)
+		zlog.Info("Login suss...")
 	} else {
 		request.GetConnection().SetIsLogin(false)
+		zlog.Error("Login error...")
 		//登录失败
 		request.GetConnection().SendBuffMsg(comm.NewLoginRetMsg(0, 1).GetMsg())
 	}
@@ -104,7 +105,7 @@ func (this *CheckFileRouter) Handle(request ziface.IRequest) {
 		return
 	} else {
 		//存在，则校验MD5
-		md5, err := utils.GetFileMd5(FileAPath, ckcekf.CheckType)
+		md5, err := utils.GetFileMd5(FileAPath, byte(ckcekf.CheckType))
 		if err != nil {
 			zlog.Error(err)
 			return
@@ -137,7 +138,7 @@ func (this *SendFileReqRouter) Handle(request ziface.IRequest) {
 		return
 	}
 
-	syncf := SyncFileHandle.GetSyncFile(request.GetConnection().GetConnID(), freq.ReqId, freq.Filepath, freq.Flen)
+	syncf := SyncFileHandle.GetSyncFile(request.GetConnection().GetConnID(), freq.ReqId, freq.Filepath, freq.Flen, freq.FlastModTime, freq.CheckType, freq.Check)
 	//不是同一个客户端ID，则锁住
 	if syncf.ClientId != request.GetConnection().GetConnID() {
 		zlog.Debug("SendFileReq is lock by other client", freq.Filepath)
@@ -150,35 +151,34 @@ func (this *SendFileReqRouter) Handle(request ziface.IRequest) {
 		request.GetConnection().SendBuffMsg(comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 1).GetMsg())
 		return
 	}
-
-	//如果文件不存在,则上传文件,同时打开文件等待接受文件数据
-	if syncf.HasFile == false {
+	//文件校验结果  0：有相同文件，无需上传 1：文件读取错误，无需上传 2：无文件，需要上传 3：文件校验不同，需要上传 4：无校验，直接上传
+	switch syncf.CheckRet {
+	case 0: //0：有相同文件，无需上传
+		zlog.Debug("check file same", freq.Filepath)
+		SyncFileHandle.RemoveSyncFile(syncf)
+		request.GetConnection().SendBuffMsg(comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 2).GetMsg())
+		return
+	case 1:
+		zlog.Error("file read err! not upload:")
+		SyncFileHandle.RemoveSyncFile(syncf)
+		request.GetConnection().SendBuffMsg(comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 1).GetMsg())
+		return
+	case 2:
 		zlog.Info("file not found", freq.Filepath)
 		syncf.Open()
 		request.GetConnection().SendBuffMsg(comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 0).GetMsg())
 		return
-	} else {
-		//存在，则校验MD5
-		md5, err := utils.GetFileMd5(syncf.FileAPath, freq.CheckType)
-		if err != nil {
-			zlog.Error("check md5 err:", err)
-			SyncFileHandle.RemoveSyncFile(syncf)
-			request.GetConnection().SendBuffMsg(comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 1).GetMsg())
-			return
-		}
-		if bytes.Equal(md5, freq.Check) {
-			zlog.Info("check file same", freq.Filepath)
-			SyncFileHandle.RemoveSyncFile(syncf)
-			request.GetConnection().SendBuffMsg(comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 2).GetMsg())
-			return
-		} else {
-			zlog.Info("check file is different", freq.Filepath)
-			syncf.Open()
-			request.GetConnection().SendBuffMsg(comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 0).GetMsg())
-			return
-		}
+	case 3:
+		zlog.Info("check file is different", freq.Filepath)
+		syncf.Open()
+		request.GetConnection().SendBuffMsg(comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 0).GetMsg())
+		return
+	case 4:
+		zlog.Info("file not check,upload", freq.Filepath)
+		syncf.Open()
+		request.GetConnection().SendBuffMsg(comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 0).GetMsg())
+		return
 	}
-
 }
 
 //------------------------------------------------------------------------------------------------------------------request同步/异步请求处理
@@ -216,7 +216,7 @@ func (this *RequestRouter) Handle(request ziface.IRequest) {
 func (this *RequestRouter) HandleSendFileReq(request ziface.IRequest, data []byte) ziface.IMessage {
 	freq := comm.NewSendFileReqMsgByByte(data)
 	zlog.Debug("HandleSendFileReq.....", freq.Filepath)
-	syncf := SyncFileHandle.GetSyncFile(request.GetConnection().GetConnID(), freq.ReqId, freq.Filepath, freq.Flen)
+	syncf := SyncFileHandle.GetSyncFile(request.GetConnection().GetConnID(), freq.ReqId, freq.Filepath, freq.Flen, freq.FlastModTime, freq.CheckType, freq.Check)
 	//不是同一个客户端ID，则锁住
 	if syncf.ClientId != request.GetConnection().GetConnID() {
 		zlog.Debug("SendFileReq is lock by other client", freq.Filepath)
@@ -229,28 +229,30 @@ func (this *RequestRouter) HandleSendFileReq(request ziface.IRequest, data []byt
 	}
 
 	//如果文件不存在,则上传文件,同时打开文件等待接受文件数据
-	if syncf.HasFile == false {
+	//文件校验结果  0：有相同文件，无需上传 1：文件读取错误，无需上传 2：无文件，需要上传 3：文件校验不同，需要上传 4：无校验，直接上传
+	switch syncf.CheckRet {
+	case 0: //0：有相同文件，无需上传
+		zlog.Debug("check file same", freq.Filepath)
+		SyncFileHandle.RemoveSyncFile(syncf)
+		return comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 2).GetMsg()
+	case 1:
+		zlog.Error("file read err! not upload:")
+		SyncFileHandle.RemoveSyncFile(syncf)
+		return comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 1).GetMsg()
+	case 2:
 		zlog.Info("file not found", freq.Filepath)
 		syncf.Open()
 		return comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 0).GetMsg()
-	} else {
-		//存在，则校验MD5
-		md5, err := utils.GetFileMd5(syncf.FileAPath, freq.CheckType)
-		if err != nil {
-			zlog.Error("check md5 err:", err)
-			SyncFileHandle.RemoveSyncFile(syncf)
-			return comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 1).GetMsg()
-		}
-		if bytes.Equal(md5, freq.Check) {
-			zlog.Info("check file same", freq.Filepath)
-			SyncFileHandle.RemoveSyncFile(syncf)
-			return comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 2).GetMsg()
-		} else {
-			zlog.Info("check file is different", freq.Filepath)
-			syncf.Open()
-			return comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 0).GetMsg()
-		}
+	case 3:
+		zlog.Info("check file is different", freq.Filepath)
+		syncf.Open()
+		return comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 0).GetMsg()
+	case 4:
+		zlog.Info("file not check,upload", freq.Filepath)
+		syncf.Open()
+		return comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 0).GetMsg()
 	}
+	return comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 1).GetMsg()
 }
 
 //------------------------------------------------------------------------------------------------------------------SendFileMsg发送文件块的接受处理
@@ -270,9 +272,9 @@ func (this *SendFileMsgRouter) Handle(request ziface.IRequest) {
 	}
 	syncf, ok := SyncFileHandle.GetSyncFileById(sf.FileId)
 	if ok == false {
-		syncf.Close()
-		SyncFileHandle.RemoveSyncFile(syncf)
-		zlog.Error("SendFileMsg error SyncFileHandle null", sf.FileId, syncf.FileAPath)
+		//syncf.Close()
+		//SyncFileHandle.RemoveSyncFile(syncf)
+		zlog.Error("SendFileMsg error SyncFileHandle null", sf.FileId)
 		request.GetConnection().SendBuffMsg(comm.NewSendFileRetMsg(sf.SecId, sf.FileId, sf.Start, 2).GetMsg())
 		return
 	}
@@ -291,7 +293,7 @@ func (this *SendFileMsgRouter) Handle(request ziface.IRequest) {
 		request.GetConnection().SendBuffMsg(comm.NewSendFileRetMsg(sf.SecId, sf.FileId, sf.Start, 1).GetMsg())
 		return
 	case 2:
-		zlog.Error("write Error...", syncf.FileAPath)
+		zlog.Error("write Error...", syncf.FileAPath, syncf.FilePt)
 		syncf.Close()
 		SyncFileHandle.RemoveSyncFile(syncf)
 		request.GetConnection().SendBuffMsg(comm.NewSendFileRetMsg(sf.SecId, sf.FileId, sf.Start, 2).GetMsg())

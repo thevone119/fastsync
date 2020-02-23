@@ -107,7 +107,7 @@ func (n *NetWork) connect() {
 }
 
 //断开连接
-func (n *NetWork) disconnect() {
+func (n *NetWork) Disconnect() {
 	n.Connected = false
 	n.Login = false
 	n.ExitBuffChan <- true
@@ -183,7 +183,7 @@ func (n *NetWork) gosendData() {
 
 //接受到数据,这个方法不对外,go方法，循环读取数据
 func (n *NetWork) receiveData() {
-	defer n.disconnect()
+	defer n.Disconnect()
 	for {
 		if n.Connected == false {
 			return

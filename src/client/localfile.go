@@ -1,7 +1,7 @@
 package client
 
 import (
-	"bytes"
+	"comm"
 	"crypto/md5"
 	"encoding/binary"
 	"io"
@@ -23,27 +23,28 @@ type localFileHandle struct {
 var MAX_CACHE_SIZE = int64(1024 * 1000)
 
 type LocalFile struct {
-	LPath        string       //本机路径（绝对路径）
-	RPath        string       //远程路径（远程的相对路径）
-	cktype       byte         //文件校验类型
-	FH           *os.File     //本机文件指针
-	Flen         int64        //文件大小
-	FileMd5      []byte       //文件的MD5
-	CacheFile    []byte       //文件的缓存，如果文件超过1M则不进行缓存了。
-	FOpen        bool         //文件是否打开
-	Ferr         error        //文件读写异常
-	FlastModTime int64        //文件的最后修改时间,秒
-	flock        sync.RWMutex //读写锁
+	LPath        string             //本机路径（绝对路径）
+	RPath        string             //远程路径（远程的相对路径）
+	cktype       comm.CheckFileType //文件校验类型
+	FH           *os.File           //本机文件指针
+	Flen         int64              //文件大小
+	FileMd5      []byte             //文件的MD5
+	CacheFile    []byte             //文件的缓存，如果文件超过1M则不进行缓存了。
+	FOpen        bool               //文件是否打开
+	Ferr         error              //文件读写异常
+	FlastModTime int64              //文件的最后修改时间,秒
+	flock        sync.RWMutex       //读写锁
 }
 
-func NewLocalFile(lp string, rp string, ct byte) *LocalFile {
+func NewLocalFile(lp string, rp string, ct comm.CheckFileType) *LocalFile {
 	l := &LocalFile{
-		LPath:  lp,
-		RPath:  rp,
-		cktype: ct,
-		FOpen:  false,
-		FH:     nil,
-		Ferr:   nil,
+		LPath:   lp,
+		RPath:   rp,
+		cktype:  ct,
+		FOpen:   false,
+		FH:      nil,
+		Ferr:    nil,
+		FileMd5: make([]byte, 16),
 	}
 	//这里做一些初始化等处理
 	l.init()
@@ -74,7 +75,7 @@ func (this *LocalFile) init() {
 	//文件的基础信息
 	this.FlastModTime = fi.ModTime().Unix()
 	this.Flen = fi.Size()
-	hash := md5.New()
+
 	var result []byte
 	if this.Flen < MAX_CACHE_SIZE {
 		//所有数据读入缓存
@@ -87,26 +88,26 @@ func (this *LocalFile) init() {
 		}
 		//缓存中对数据进行MD5
 		switch this.cktype {
-		case 0:
-			this.FileMd5 = make([]byte, 16)
+		case comm.FCHECK_NOT_CHECK:
+		case comm.FCHECK_SIZE_CHECK:
+		case comm.FCHECK_SIZE_AND_TIME_CHECK:
+			//this.FileMd5 = make([]byte, 16)
 			break
-		case 1:
-			bytesBuffer := bytes.NewBuffer([]byte{})
-			binary.Write(bytesBuffer, binary.BigEndian, int64(this.Flen))
-			hash.Write(bytesBuffer.Bytes())
-			this.FileMd5 = hash.Sum(result)
-			break
-		case 2:
+		case comm.FCHECK_FASTMD5_CHECK:
+			hash := md5.New()
 			//最多只取10块内容做MD5
 			var clean = this.Flen / 10
 			var start = int64(0)
 			var end = int64(0)
+			var temp = make([]byte, 1024)
 			for {
 				end = start + 1024
 				if end > this.Flen {
 					end = this.Flen
 				}
-				temp := this.CacheFile[start:end]
+				for i := start; i < end; i++ {
+					temp[i-start] = this.CacheFile[i]
+				}
 				hash.Write(temp)
 				start = end + clean
 				if start >= this.Flen {
@@ -118,7 +119,8 @@ func (this *LocalFile) init() {
 			hash.Write(len_b)
 			this.FileMd5 = hash.Sum(result)
 			break
-		case 3:
+		case comm.FCHECK_FULLMD5_CHECK:
+			hash := md5.New()
 			hash.Write(this.CacheFile)
 			this.FileMd5 = hash.Sum(result)
 			break
@@ -127,16 +129,13 @@ func (this *LocalFile) init() {
 	} else {
 		//缓存中对数据进行MD5
 		switch this.cktype {
-		case 0:
-			this.FileMd5 = make([]byte, 16)
+		case comm.FCHECK_NOT_CHECK:
+		case comm.FCHECK_SIZE_CHECK:
+		case comm.FCHECK_SIZE_AND_TIME_CHECK:
+			//this.FileMd5 = make([]byte, 16)
 			break
-		case 1:
-			bytesBuffer := bytes.NewBuffer([]byte{})
-			binary.Write(bytesBuffer, binary.BigEndian, int64(this.Flen))
-			hash.Write(bytesBuffer.Bytes())
-			this.FileMd5 = hash.Sum(result)
-			break
-		case 2:
+		case comm.FCHECK_FASTMD5_CHECK:
+			hash := md5.New()
 			//获取文件大小
 			//最多只取10块内容做MD5
 			var clean = this.Flen / 10
@@ -155,7 +154,8 @@ func (this *LocalFile) init() {
 			this.FileMd5 = hash.Sum(result)
 			this.FH.Seek(0, io.SeekStart)
 			break
-		case 3:
+		case comm.FCHECK_FULLMD5_CHECK:
+			hash := md5.New()
 			if _, err := io.Copy(hash, this.FH); err != nil {
 				this.Ferr = err
 				this.Close()
@@ -169,12 +169,17 @@ func (this *LocalFile) init() {
 
 func (this *LocalFile) Read(start int64, b []byte) (n int, err error) {
 	if this.Flen < MAX_CACHE_SIZE {
+
+		if start >= this.Flen {
+			return 0, nil
+		}
 		readnum := int64(len(b))
 		if readnum > this.Flen-start {
 			readnum = this.Flen - start
 		}
-		for i := start; i < readnum+start; i++ {
-			b[i] = this.CacheFile[i]
+		end := readnum + start
+		for i := start; i < end; i++ {
+			b[i-start] = this.CacheFile[i]
 		}
 		return int(readnum), nil
 	} else {

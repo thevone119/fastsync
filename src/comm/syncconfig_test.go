@@ -26,6 +26,9 @@ func TestSyncConfig(t *testing.T) {
 	}
 	fmt.Println(AppendPath("d:/test/ttttt/ttttt/", "/test/ttttt/ttttt/1.txt"))
 
+	vs := "fasljfa/"
+	fmt.Println("tt:", vs[:len(vs)-1])
+
 	dstwrite, err := os.Create(s)
 	if err != nil {
 		fmt.Println(err)

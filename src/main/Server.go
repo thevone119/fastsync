@@ -16,7 +16,7 @@ func DoConnectionBegin(conn ziface.IConnection) {
 
 //连接断开的时候执行
 func DoConnectionLost(conn ziface.IConnection) {
-	fmt.Println("DoConnectionLost is Called ... ")
+	fmt.Println("DoConnectionLost is Called ... ", conn.GetConnID())
 	//在连接销毁之前，做连接捆绑内容的清理
 	server.SyncFileHandle.CloseAll(conn.GetConnID())
 }

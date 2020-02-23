@@ -57,6 +57,10 @@ func (g *clientConfig) GetRelativePath(lp string) (string, error) {
 	if strings.Index(lp, g.BasePath) != 0 {
 		return "", errors.New("path err:" + lp)
 	}
+	p := lp[len(g.BasePath):]
 
-	return lp[len(g.BasePath):], nil
+	if strings.Index(p, "/") == 0 {
+		p = p[1:]
+	}
+	return p, nil
 }

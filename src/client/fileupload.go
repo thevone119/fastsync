@@ -80,7 +80,7 @@ func (n *FileUpload) doUploadChan(l *LocalFile) {
 	//这里要做个判断，判断客户端连接是否超时，如果客户端超过5秒没连接了，这个直接就失败了。某个客户端没连接，柱塞所有的任务
 
 	//1.同步请求，请求服务器，看是否需要上传，如果需要上传
-	n.netclient.SendData(comm.NewSendFileReqMsg(_secId, l.Flen, l.FileMd5, l.cktype, 1, l.RPath).GetMsg())
+	n.netclient.SendData(comm.NewSendFileReqMsg(_secId, l.Flen, l.FlastModTime, l.FileMd5, l.cktype, 1, l.RPath).GetMsg())
 
 	//2.柱塞等待返回，10秒超时
 	for {
@@ -141,9 +141,9 @@ func (n *FileUpload) doUploadChan2(fh uint32, l *LocalFile) {
 
 callback:-1:未知异常
 */
-func (n *FileUpload) Upload_back(lp string, rp string, checktype byte, callback func(byte)) {
+func (n *FileUpload) Upload_back(lp string, rp string, checktype comm.CheckFileType, callback func(byte)) {
 	//1.开启上传文件请求通道
-	md5, err := utils.GetFileMd5(lp, checktype)
+	md5, err := utils.GetFileMd5(lp, byte(checktype))
 	if err != nil {
 		fmt.Println("md5 error", lp, err)
 		callback(100)
@@ -159,7 +159,7 @@ func (n *FileUpload) Upload_back(lp string, rp string, checktype byte, callback 
 	reqid := utils.GetNextUint()
 
 	//同步请求
-	retb, err := n.netclient.Request(comm.NewSendFileReqMsg(reqid, filei.Size(), md5, checktype, 1, rp).GetMsg())
+	retb, err := n.netclient.Request(comm.NewSendFileReqMsg(reqid, filei.Size(), filei.ModTime().Unix(), md5, checktype, 1, rp).GetMsg())
 
 	if err != nil {
 		fmt.Println("request SendFileReqMsg error", lp, err)

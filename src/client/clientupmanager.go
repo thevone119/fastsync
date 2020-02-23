@@ -1,6 +1,7 @@
 package client
 
 import (
+	"comm"
 	"io/ioutil"
 	"strconv"
 	"strings"
@@ -48,10 +49,14 @@ func srtToFileUpload(str string) *FileUpload {
 
 //同步某个目录到服务器中去/包括目录下的所有文件
 func (c *ClientUpManager) SyncPath(lp string) {
+	if strings.Index(lp, "/") == 0 {
+		lp = lp[1:]
+	}
 	rd, err := ioutil.ReadDir(lp)
 	if err != nil {
 		return
 	}
+
 	for _, fi := range rd {
 		if fi.IsDir() { // 如果是目录，则回调
 			fullDir := lp + "/" + fi.Name()
@@ -59,19 +64,20 @@ func (c *ClientUpManager) SyncPath(lp string) {
 			continue
 		} else {
 			fullName := lp + "/" + fi.Name()
-			c.SyncFile(fullName, 3)
+			c.SyncFile(fullName, 2)
 		}
 	}
 }
 
 //同步某个文件到服务器,本机文件新增，修改的时候，就调用这个方法
-//cktype:文件的校验类型
-func (c *ClientUpManager) SyncFile(lp string, cktype byte) {
+//cktype:文件的校验类型 //0:不校验  1:size校验 2:fastmd5  3:fullmd5
+func (c *ClientUpManager) SyncFile(lp string, cktype comm.CheckFileType) {
 	zlog.Debug("SyncFile..", lp)
 	//1.读取判断本地文件是否存在，大小，MD5等
 	rlp, err := ClientConfigObj.GetRelativePath(lp)
 	if err != nil {
 		zlog.Error("SyncFile..err,path:", lp)
+		return
 	}
 	ul := NewLocalFile(lp, rlp, cktype)
 	for _, fu := range c.RemoteUpLoad {
@@ -120,5 +126,12 @@ func (c *ClientUpManager) MoveFile(srcp string, dstp string) {
 	}
 	for _, fu := range c.RemoteUpLoad {
 		fu.MoveFile(rsrcp, rdstp)
+	}
+}
+
+func (c *ClientUpManager) Close() {
+	//装置客户端上传类
+	for _, fu := range c.RemoteUpLoad {
+		fu.netclient.Disconnect()
 	}
 }
