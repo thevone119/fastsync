@@ -9,6 +9,7 @@ import (
 	"time"
 	"utils"
 	"zinx/ziface"
+	"zinx/zlog"
 )
 
 //文件上传类
@@ -77,12 +78,17 @@ func (n *FileUpload) doUploadChan(l *LocalFile) {
 	n.secId++
 	_secId := n.secId
 
-	//这里要做个判断，判断客户端连接是否超时，如果客户端超过5秒没连接了，这个直接就失败了。某个客户端没连接，柱塞所有的任务
-
+	//这里要做个判断，判断客户端是否活动，如果不在活动中，这个直接就失败了。避免某个客户端连接不上，柱塞所有的任务
+	if !n.netclient.IsActivity() {
+		n.logUploadError(l.LPath, "校验文件上传超时")
+		return
+	}
 	//1.同步请求，请求服务器，看是否需要上传，如果需要上传
 	n.netclient.SendData(comm.NewSendFileReqMsg(_secId, l.Flen, l.FlastModTime, l.FileMd5, l.cktype, 1, l.RPath).GetMsg())
 
-	//2.柱塞等待返回，10秒超时
+	//超时时间，5秒+50M每秒（MD5校验文件，至少能达到50M/S的速度）
+	timeout := 5 + l.Flen/(1024*1024*50)
+	//2.柱塞等待返回，5秒超时
 	for {
 		select {
 		case data, ok := <-n.sendFileReqRetChan:
@@ -97,7 +103,7 @@ func (n *FileUpload) doUploadChan(l *LocalFile) {
 				}
 				return
 			}
-		case <-time.After(time.Duration(10) * time.Second):
+		case <-time.After(time.Duration(timeout) * time.Second):
 			//超时了，这里做个处理
 			n.logUploadError(l.LPath, "校验文件上传超时")
 			return
@@ -255,5 +261,5 @@ func (n *FileUpload) logUploadSuss(lp string, msg string) {
 
 //记录上传失败记录
 func (n *FileUpload) logUploadError(lp string, msg string) {
-
+	zlog.Error(lp, msg)
 }
