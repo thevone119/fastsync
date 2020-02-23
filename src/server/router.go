@@ -138,6 +138,15 @@ func (this *SendFileReqRouter) Handle(request ziface.IRequest) {
 		return
 	}
 
+	//每个文件锁2秒
+	if comm.TempMap.Has(freq.Filepath) {
+		zlog.Debug("SendFileReq is lock by other", freq.Filepath)
+		request.GetConnection().SendBuffMsg(comm.NewSendFileReqRetMsg(freq.ReqId, 0, 1).GetMsg())
+		return
+	} else {
+		comm.TempMap.Put(freq.Filepath, "", 2)
+	}
+
 	syncf := SyncFileHandle.GetSyncFile(request.GetConnection().GetConnID(), freq.ReqId, freq.Filepath, freq.Flen, freq.FlastModTime, freq.CheckType, freq.Check)
 	//不是同一个客户端ID，则锁住
 	if syncf.ClientId != request.GetConnection().GetConnID() {
