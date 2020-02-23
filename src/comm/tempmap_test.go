@@ -2,36 +2,36 @@ package comm
 
 import (
 	"fmt"
+	"math/rand"
+	"strconv"
 	"testing"
 	"time"
-	"utils"
 )
 
 func TestTempMap(t *testing.T) {
-	TempMap.Put("key","value",10)
-	TempMap.Put("key2","value",10)
-	TempMap.Put("key3","value",10)
-	TempMap.Remove("key5")
-	for{
-		v,ok:=TempMap.Get("key")
-		if ok==false{
-			fmt.Println("---------err")
-		}else{
-			fmt.Println("value:",v)
+	go goRead()
+	rand.Seed(time.Now().UnixNano())
+	for {
+		//随机放入100万个字符串到tempmap,每6秒放一次，测试内存
+		for i := 0; i < 1000000; i++ {
+			TempMap.Put("jianhang/eportalapp/.svn/pristine/48/489ed6a9c610bf03a4b5b398592c43c382e54be0.svn-base_"+strconv.FormatInt(rand.Int63(), 10)+"_"+string(i), "value", 3)
 		}
-		currtime := time.Now().UnixNano() / 1e6
-		mdb,err:=utils.GetFileMd5("/test/UnityPlayer.dll",1)
-		fmt.Println("md5 usetime :",time.Now().UnixNano() / 1e6-currtime)
+		time.Sleep(2 * time.Second)
+		fmt.Println("jianhang/eportalapp/.svn/pristine/48/489ed6a9c610bf03a4b5b398592c43c382e54be0.svn-base_" + strconv.FormatInt(rand.Int63(), 10))
+		fmt.Println("put end...", TempMap.len())
+	}
 
-		if err!=nil{
-			fmt.Println("md5 :",err)
-		}else{
-			fmt.Println("md5 len:",len(mdb))
-			fmt.Println("md5:",fmt.Sprintf("%x",mdb))
+}
+
+//同时开启读取操作，每2秒循环1万次的读取
+func goRead() {
+	rand.Seed(time.Now().UnixNano())
+	for {
+		for i := 0; i < 10000; i++ {
+			TempMap.Get("jianhang/eportalapp/.svn/pristine/48/489ed6a9c610bf03a4b5b398592c43c382e54be0.svn-base_" + string(rand.Int63()))
 		}
-
-
-		time.Sleep(1* time.Second)
+		time.Sleep(2 * time.Second)
+		fmt.Println("get end...")
 	}
 
 }

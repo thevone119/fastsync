@@ -2,13 +2,17 @@ package comm
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestSyncConfig(t *testing.T) {
-
+	rand.Seed(time.Now().UnixNano())
+	fmt.Println(rand.Int63(), rand.Int63())
+	fmt.Println(rand.Int63(), rand.Int63())
 	var s = "d:/test/ttttt/ttttt/1.txt"
 	_, err := os.Stat(s)
 	if err != nil {

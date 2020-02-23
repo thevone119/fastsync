@@ -70,15 +70,15 @@ func (s *syncFileHandle) CloseAll(cid uint32) {
 	}
 }
 
-//定时清理，每5分钟清理一次哦，超过5分钟没有操作的文件，则关闭文件
+//定时清理，每3分钟清理一次哦，超过3分钟没有操作的文件，则关闭文件
 func (s *syncFileHandle) ClearTimeout() {
 	ct := time.Now().Unix()
 	if ct > s.nextClearTime {
-		s.nextClearTime = ct + 60*5
+		s.nextClearTime = ct + 60*3
 		//清理
 		s.flock.Lock()
 		defer s.flock.Unlock()
-		clearTime := ct - 60*5
+		clearTime := ct - 60*3
 		for k, v := range s.fmap {
 			if v.LastTime < clearTime {
 				v.Close()
