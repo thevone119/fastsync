@@ -328,6 +328,17 @@ func (this *DeleteFileRouter) Handle(request ziface.IRequest) {
 	}
 	//文件的绝对路径
 	FileAPath := comm.AppendPath(ServerConfigObj.BasePath, sf.Filepath)
+
+	//每个文件锁2秒
+	if comm.TempMap.Has(FileAPath) {
+		zlog.Debug("DeleteFile is lock by other", FileAPath)
+		request.GetConnection().SendBuffMsg(comm.NewCommRetMsg(sf.SecId, 1, "文件锁定，无法操作", 0, "").GetMsg())
+		return
+	} else {
+		comm.TempMap.Put(FileAPath, "", 1000)
+		defer comm.TempMap.Remove(FileAPath)
+	}
+
 	//删除文件
 	err := os.Remove(FileAPath)
 
@@ -358,10 +369,20 @@ func (this *MoveFileRouter) Handle(request ziface.IRequest) {
 	//文件的绝对路径
 	srcFileAPath := comm.AppendPath(ServerConfigObj.BasePath, sf.SrcFilepath)
 	dstFileAPath := comm.AppendPath(ServerConfigObj.BasePath, sf.DstFilepath)
+	//每个文件锁2秒
+	if comm.TempMap.Has(srcFileAPath) {
+		zlog.Debug("MoveFile is lock by other", srcFileAPath)
+		request.GetConnection().SendBuffMsg(comm.NewCommRetMsg(sf.SecId, 1, "文件锁定，无法操作", 0, "").GetMsg())
+		return
+	} else {
+		comm.TempMap.Put(srcFileAPath, "", 1000)
+		defer comm.TempMap.Remove(srcFileAPath)
+	}
 	//判断文件/目录是否存在
 	files, err := os.Stat(srcFileAPath)
 	if err != nil {
 		// 移动失败
+		zlog.Error("MoveFile err no src file...", srcFileAPath)
 		request.GetConnection().SendBuffMsg(comm.NewCommRetMsg(sf.SecId, 1, "移动失败", 0, "").GetMsg())
 		return
 	}
@@ -412,12 +433,12 @@ func (this *MoveFileRouter) copyFile(src string, dst string) error {
 		return err
 	}
 	defer source.Close()
-	dstwrite, err := os.Create(src)
+	dstwrite, err := os.Create(dst)
 	if err != nil {
 		return err
 	}
 	defer dstwrite.Close()
-	_, err = io.Copy(source, dstwrite)
+	_, err = io.Copy(dstwrite, source)
 	if err != nil {
 		return err
 	}
