@@ -43,6 +43,17 @@ func (mh *MsgHandle) DoMsgHandler(request ziface.IRequest) {
 		return
 	}
 
+	//错误拦截必须配合defer使用  通过匿名函数使用
+	//这里是全局所有的业务逻辑调用方法，如果这里出错了。则直接中断客户端连接,避免程序死掉
+	defer func() {
+		//恢复程序的控制权
+		err := recover()
+		if err != nil {
+			zlog.Error(err)
+			request.GetConnection().Stop()
+		}
+	}()
+
 	//执行对应处理方法
 	handler.PreHandle(request)
 	handler.Handle(request)
