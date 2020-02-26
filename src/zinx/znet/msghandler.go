@@ -49,7 +49,7 @@ func (mh *MsgHandle) DoMsgHandler(request ziface.IRequest) {
 		//恢复程序的控制权
 		err := recover()
 		if err != nil {
-			zlog.Error(err)
+			zlog.Error("程序出现意外错误，关闭客户端连接", err)
 			request.GetConnection().Stop()
 		}
 	}()
