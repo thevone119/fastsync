@@ -366,6 +366,7 @@ func (this *MoveFileRouter) Handle(request ziface.IRequest) {
 		request.GetConnection().SendBuffMsg(comm.NewCommRetMsg(sf.SecId, 1, "用户未登录", 0, "").GetMsg())
 		return
 	}
+
 	//文件的绝对路径
 	srcFileAPath := comm.AppendPath(ServerConfigObj.BasePath, sf.SrcFilepath)
 	dstFileAPath := comm.AppendPath(ServerConfigObj.BasePath, sf.DstFilepath)
