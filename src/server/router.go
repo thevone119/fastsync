@@ -386,14 +386,15 @@ func (this *MoveFileRouter) Handle(request ziface.IRequest) {
 		request.GetConnection().SendBuffMsg(comm.NewCommRetMsg(sf.SecId, 1, "移动失败", 0, "").GetMsg())
 		return
 	}
-
+	//是否删除源
+	rmsrc := sf.OpType == 1
 	//如果是文件夹，递归调用
 	if files.IsDir() {
-		err = this.copyDir(srcFileAPath, dstFileAPath)
+		err = this.copyDir(srcFileAPath, dstFileAPath, rmsrc)
 	} else {
 		//先创建目录，再复制
 		os.MkdirAll(dstFileAPath[:strings.LastIndex(dstFileAPath, "/")], os.ModePerm)
-		err = this.copyFile(srcFileAPath, dstFileAPath)
+		err = this.copyFile(srcFileAPath, dstFileAPath, rmsrc)
 	}
 	if err != nil {
 		// 移动失败
@@ -401,14 +402,10 @@ func (this *MoveFileRouter) Handle(request ziface.IRequest) {
 	} else {
 		// 移动成功
 		request.GetConnection().SendBuffMsg(comm.NewCommRetMsg(sf.SecId, 0, "", 0, "").GetMsg())
-		//如果是move 则删除源
-		if sf.OpType == 1 {
-			os.Remove(srcFileAPath)
-		}
 	}
 }
 
-func (this *MoveFileRouter) copyDir(src string, dst string) error {
+func (this *MoveFileRouter) copyDir(src string, dst string, rmsrc bool) error {
 	rd, err := ioutil.ReadDir(src)
 	if err != nil {
 		return err
@@ -417,22 +414,28 @@ func (this *MoveFileRouter) copyDir(src string, dst string) error {
 	os.MkdirAll(dst, os.ModePerm)
 	for _, fi := range rd {
 		if fi.IsDir() { // 如果是目录，则回调
-			this.copyDir(src+"/"+fi.Name(), dst+"/"+fi.Name())
+			this.copyDir(src+"/"+fi.Name(), dst+"/"+fi.Name(), rmsrc)
 			continue
 		} else {
-			this.copyFile(src+"/"+fi.Name(), dst+"/"+fi.Name())
+			this.copyFile(src+"/"+fi.Name(), dst+"/"+fi.Name(), rmsrc)
 		}
 	}
 	return nil
 }
 
 //复制文件
-func (this *MoveFileRouter) copyFile(src string, dst string) error {
+func (this *MoveFileRouter) copyFile(src string, dst string, rmsrc bool) error {
 	source, err := os.Open(src)
 	if err != nil {
 		return err
 	}
-	defer source.Close()
+	defer func() {
+		source.Close()
+		if rmsrc {
+			os.Remove(src)
+		}
+	}()
+
 	dstwrite, err := os.Create(dst)
 	if err != nil {
 		return err

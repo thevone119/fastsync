@@ -39,4 +39,5 @@ func TestSyncConfig(t *testing.T) {
 	}
 	dstwrite.WriteString("tetst")
 	defer dstwrite.Close()
+
 }

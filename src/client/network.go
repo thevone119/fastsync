@@ -59,8 +59,8 @@ func NewNetWork(ip string, port int, username string, password string) *NetWork 
 		Connected:       false,
 		Login:           false,
 		ExitBuffChan:    make(chan bool, 1),
-		sendMsgs:        make(chan ziface.IMessage, 100), //缓存100个数据包 每个4K算的话，就是8M缓存
-		receive:         make(chan ziface.IMessage, 100),
+		sendMsgs:        make(chan ziface.IMessage, 10), //缓存10个数据包 每个4K算的话，就是40K缓存
+		receive:         make(chan ziface.IMessage, 10),
 		TimeOutTime:     0,
 		TimeConnected:   0,
 		ActivityTime:    0,
@@ -97,8 +97,8 @@ func (n *NetWork) connect() {
 		return
 	}
 	//这里才重新开启管道哦
-	n.sendMsgs = make(chan ziface.IMessage, 100)
-	n.receive = make(chan ziface.IMessage, 100)
+	n.sendMsgs = make(chan ziface.IMessage, 10)
+	n.receive = make(chan ziface.IMessage, 10)
 	fmt.Println("NetWork Connect succ!", n.IP)
 	n.Conn = conn
 	n.Connected = true

@@ -91,6 +91,7 @@ func (c *ClientUpManager) DeleteFile(lp string) {
 	rp, err := ClientConfigObj.GetRelativePath(lp)
 	if err != nil {
 		zlog.Error("DeleteFile..err,path:", lp)
+		return
 	}
 	for _, fu := range c.RemoteUpLoad {
 		fu.DeleteFile(rp)
@@ -103,10 +104,12 @@ func (c *ClientUpManager) CopyFile(srcp string, dstp string) {
 	rsrcp, err := ClientConfigObj.GetRelativePath(srcp)
 	if err != nil {
 		zlog.Error("CopyFile..err,path:", srcp)
+		return
 	}
 	rdstp, err := ClientConfigObj.GetRelativePath(dstp)
 	if err != nil {
 		zlog.Error("CopyFile..err,path:", dstp)
+		return
 	}
 	for _, fu := range c.RemoteUpLoad {
 		fu.CopyFile(rsrcp, rdstp)
@@ -119,10 +122,12 @@ func (c *ClientUpManager) MoveFile(srcp string, dstp string) {
 	rsrcp, err := ClientConfigObj.GetRelativePath(srcp)
 	if err != nil {
 		zlog.Error("CopyFile..err,path:", srcp)
+		return
 	}
 	rdstp, err := ClientConfigObj.GetRelativePath(dstp)
 	if err != nil {
 		zlog.Error("CopyFile..err,path:", dstp)
+		return
 	}
 	for _, fu := range c.RemoteUpLoad {
 		fu.MoveFile(rsrcp, rdstp)

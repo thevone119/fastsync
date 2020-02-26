@@ -55,7 +55,7 @@ func (g *clientConfig) reload() {
 //根据绝对路径，获取相对路径
 func (g *clientConfig) GetRelativePath(lp string) (string, error) {
 	if strings.Index(lp, g.BasePath) != 0 {
-		return "", errors.New("path err:" + lp)
+		return "", errors.New("path err:" + lp + ",basePath:" + g.BasePath)
 	}
 	p := lp[len(g.BasePath):]
 
