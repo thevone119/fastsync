@@ -38,6 +38,7 @@ func AppendPath(p1 string, p2 string) string {
 	if strings.LastIndex(p2, "/") == len(p2)-1 && len(p2) > 0 {
 		p2 = p2[0 : len(p2)-1]
 	}
+
 	if strings.Index(p2, "/") == 0 {
 		p2 = p2[1:]
 	}
