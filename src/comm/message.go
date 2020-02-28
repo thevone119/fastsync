@@ -10,6 +10,8 @@ import (
 	"zinx/znet"
 )
 
+//这里定义所有的命令字（即所有的socket数据包）
+
 //枚举类型的消息
 const (
 	MID_NullPacket = iota
