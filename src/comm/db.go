@@ -30,6 +30,7 @@ func init() {
 	FileDB.open()
 }
 
+//只开，不关，只有一个应用使用，引用退出，自动就退出了
 func (f *filedb) open() {
 	if f.isopen {
 		return
@@ -109,7 +110,7 @@ func (f *filedb) GetInt64(bucket string, key string) (int64, error) {
 		ret = x
 		return nil
 	})
-	return int64(-1), err
+	return ret, err
 }
 
 func (f *filedb) RemoveString(bucket string, key string) error {
