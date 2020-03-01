@@ -66,6 +66,8 @@ func (n *FileUpload) goupLoadProcess() {
 		case data, ok := <-n.upLoads:
 			if ok {
 				n.doUploadChan(data)
+				//这里对发送完成做处理
+
 			}
 		}
 	}
