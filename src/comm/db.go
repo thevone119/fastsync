@@ -15,7 +15,7 @@ import (
 var FileDB *filedb
 
 type filedb struct {
-	path   string
+	DBPath string
 	db     *bolt.DB
 	isopen bool
 }
@@ -25,30 +25,29 @@ type filedb struct {
 */
 func init() {
 	//初始化全局变量，设置一些默认值
-
+	//每个进程一个数据库文件。不能开多个进程，否则就会发生数据文件锁哦，这个数据文件无法多个进程共享的
 	FileDB = &filedb{
-		path: "fastsync.db",
+		DBPath: "fastsync.db",
 	}
 	path, err := os.Executable()
 	if err != nil {
 		zlog.Error("open db error")
 		return
 	}
-	FileDB.path = path + ".db"
-	zlog.Info(FileDB.path, " open")
-	FileDB.open()
+	FileDB.DBPath = path + ".db"
 }
 
 //只开，不关，只有一个应用使用，引用退出，自动就退出了
-func (f *filedb) open() {
+func (f *filedb) Open() {
 	if f.isopen {
 		return
 	}
-	db, err := bolt.Open(f.path, 0600, &bolt.Options{Timeout: 10 * time.Second})
+	db, err := bolt.Open(f.DBPath, 0600, &bolt.Options{Timeout: 3 * time.Second})
 	if err != nil {
 		zlog.Error("open db err", err)
 		return
 	}
+	zlog.Info(FileDB.DBPath, " open")
 	f.db = db
 	f.isopen = true
 }
