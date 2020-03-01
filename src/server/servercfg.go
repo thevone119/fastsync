@@ -10,6 +10,7 @@ import (
 //服务端配置
 type serverConfig struct {
 	BasePath     string //文件服务的基础路径
+	AllowDel     bool   //是否允许删除
 	ConfFilePath string
 	UserName     string //服务器的登录用户名
 	PassWord     string //服务器的密码
@@ -26,10 +27,11 @@ var ServerConfigObj *serverConfig
 func init() {
 	//初始化GlobalObject变量，设置一些默认值
 	ServerConfigObj = &serverConfig{
-		BasePath:     "/test",
+		BasePath:     "/home/ap/ccb/fastsync",
 		ConfFilePath: "conf/server.json",
 		UserName:     "admin",
 		PassWord:     "admin123",
+		AllowDel:     false,
 	}
 
 	//从配置文件中加载一些用户配置的参数

@@ -317,6 +317,10 @@ type DeleteFileRouter struct {
 
 //
 func (this *DeleteFileRouter) Handle(request ziface.IRequest) {
+	if !ServerConfigObj.AllowDel {
+		zlog.Debug("AllowDel", ServerConfigObj.AllowDel)
+		return
+	}
 	zlog.Debug("DeleteFileMsg...")
 	sf := comm.NewDeleteFileReqMsgByByte(request.GetData())
 
