@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"github.com/boltdb/bolt"
+	"os"
 	"time"
 	"zinx/zlog"
 )
@@ -24,9 +25,17 @@ type filedb struct {
 */
 func init() {
 	//初始化全局变量，设置一些默认值
+
 	FileDB = &filedb{
 		path: "fastsync.db",
 	}
+	path, err := os.Executable()
+	if err != nil {
+		zlog.Error("open db error")
+		return
+	}
+	FileDB.path = path + ".db"
+	zlog.Info(FileDB.path, " open")
 	FileDB.open()
 }
 
@@ -35,7 +44,7 @@ func (f *filedb) open() {
 	if f.isopen {
 		return
 	}
-	db, err := bolt.Open(f.path, 0600, &bolt.Options{Timeout: 5 * time.Second})
+	db, err := bolt.Open(f.path, 0600, &bolt.Options{Timeout: 10 * time.Second})
 	if err != nil {
 		zlog.Error("open db err", err)
 		return
