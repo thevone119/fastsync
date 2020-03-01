@@ -3,13 +3,9 @@ package client
 import (
 	"comm"
 	"errors"
-	"fmt"
 	"io"
 	"math"
-	"os"
-	"runtime/debug"
 	"time"
-	"utils"
 	"zinx/ziface"
 	"zinx/zlog"
 )
@@ -98,7 +94,7 @@ func (n *FileUpload) doUploadChan(l *LocalFile) (retb byte, err error) {
 			zlog.Error("文件上传发送意外错误", err)
 		}
 	}()
-	return doUploadChan2(l)
+	return n.doUploadChan2(l)
 }
 
 //管道上传，单线程,校验是否需要上传，如果需要上传再进行第3步的文件上传
