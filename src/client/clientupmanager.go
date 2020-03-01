@@ -83,10 +83,17 @@ func (c *ClientUpManager) SyncFile(lp string, cktype comm.CheckFileType) {
 	for _, fu := range c.RemoteUpLoad {
 		fu.SendUpload(ul)
 	}
+	//这里如果发完了，这个LocalFile要调用关闭方法，释放资源，释放文件的。
+
 }
 
 //删除服务器中的某个文件,包括文件夹
 func (c *ClientUpManager) DeleteFile(lp string) {
+	//不允许删除操作
+	if !ClientConfigObj.AllowDel {
+		zlog.Debug("AllowDel", ClientConfigObj.AllowDel, lp)
+		return
+	}
 	zlog.Debug("DeleteFile..", lp)
 	rp, err := ClientConfigObj.GetRelativePath(lp)
 	if err != nil {

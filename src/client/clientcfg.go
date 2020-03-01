@@ -11,9 +11,13 @@ import (
 
 //客户端配置
 type clientConfig struct {
-	BasePath     string
+	LocalPath        string //本机监控路径
+	LocalPathMonitor bool   //是否开启本机监控
+	//全量推送校验规则
+	AllowDel     bool //是否允许删除
 	ConfFilePath string
-	RemotePath   []string
+	RemotePath   []string //推送端路径，多个推送端
+
 }
 
 /*
@@ -27,13 +31,13 @@ var ClientConfigObj *clientConfig
 func init() {
 	//初始化GlobalObject变量，设置一些默认值
 	ClientConfigObj = &clientConfig{
-		BasePath:     "/test",
+		LocalPath:    "/test",
 		ConfFilePath: "conf/client.json",
 	}
 
 	//从配置文件中加载一些用户配置的参数
 	ClientConfigObj.reload()
-	fmt.Println("SyncConfig load BasePath:", ClientConfigObj.BasePath, "RemotePath len:", len(ClientConfigObj.RemotePath))
+	fmt.Println("SyncConfig load LocalPath:", ClientConfigObj.LocalPath, "RemotePath len:", len(ClientConfigObj.RemotePath))
 }
 
 //读取用户的配置文件
@@ -54,10 +58,10 @@ func (g *clientConfig) reload() {
 
 //根据绝对路径，获取相对路径
 func (g *clientConfig) GetRelativePath(lp string) (string, error) {
-	if strings.Index(lp, g.BasePath) != 0 {
-		return "", errors.New("path err:" + lp + ",basePath:" + g.BasePath)
+	if strings.Index(lp, g.LocalPath) != 0 {
+		return "", errors.New("path err:" + lp + ",LocalPath:" + g.LocalPath)
 	}
-	p := lp[len(g.BasePath):]
+	p := lp[len(g.LocalPath):]
 
 	if strings.Index(p, "/") == 0 {
 		p = p[1:]

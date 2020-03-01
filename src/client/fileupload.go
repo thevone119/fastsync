@@ -14,6 +14,7 @@ import (
 
 //文件上传类
 //每个远程链接对应一个这样的类，保持长链接的文件传输处理
+//记录上传结果，有上传完成事件
 
 type FileUpload struct {
 	netclient *NetWork //网络连接类，保持长连接
@@ -70,6 +71,11 @@ func (n *FileUpload) goupLoadProcess() {
 	}
 }
 
+//发送完成回调
+func (n *FileUpload) sendEndCallBack() {
+
+}
+
 //管道上传，单线程
 func (n *FileUpload) doUploadChan(l *LocalFile) {
 	if n.secId >= math.MaxUint32 {
@@ -84,7 +90,11 @@ func (n *FileUpload) doUploadChan(l *LocalFile) {
 		return
 	}
 	//1.同步请求，请求服务器，看是否需要上传，如果需要上传
-	n.netclient.SendData(comm.NewSendFileReqMsg(_secId, l.Flen, l.FlastModTime, l.FileMd5, l.cktype, 1, l.RPath).GetMsg())
+	err := n.netclient.SendData(comm.NewSendFileReqMsg(_secId, l.Flen, l.FlastModTime, l.FileMd5, l.cktype, 1, l.RPath).GetMsg())
+	if err != nil {
+		n.logUploadError(l.LPath, "服务器连接异常，发送数据失败")
+		return
+	}
 
 	//超时时间，5秒+50M每秒（MD5校验文件，至少能达到50M/S的速度）
 	timeout := 5 + l.Flen/(1024*1024*50)
@@ -129,8 +139,8 @@ func (n *FileUpload) doUploadChan2(fh uint32, l *LocalFile) {
 		if rn <= 0 {
 			break
 		}
-		//发送
-		n.netclient.Enqueue(comm.NewSendFileMsg(0, fh, start, buff[:rn]).GetMsg())
+		//发送,这里直接发即可。不用缓存了，因为这个方法本来就已经有缓存
+		n.netclient.SendData(comm.NewSendFileMsg(0, fh, start, buff[:rn]).GetMsg())
 		start += int64(rn)
 		//发送过程中，如果已经返回错误了。则直接退出哦
 

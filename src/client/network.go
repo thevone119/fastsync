@@ -156,16 +156,18 @@ func (n *NetWork) Enqueue(msg ziface.IMessage) {
 	}
 }
 
-func (n *NetWork) SendData(msg ziface.IMessage) {
+//发送数据异常
+func (n *NetWork) SendData(msg ziface.IMessage) error {
 	if !n.Connected {
-		return
+		return errors.New("Conn is colse")
 	}
 	//有数据要发送
 	_d, _ := n.dataPack.Pack(msg)
 	if _, err := n.Conn.Write(_d); err != nil {
 		zlog.Error("Send Data error:, ", err, " Conn Writer exit")
-		return
+		return errors.New("Conn is colse")
 	}
+	return nil
 }
 
 //go线程调用

@@ -169,7 +169,6 @@ func (this *LocalFile) init() {
 
 func (this *LocalFile) Read(start int64, b []byte) (n int, err error) {
 	if this.Flen < MAX_CACHE_SIZE {
-
 		if start >= this.Flen {
 			return 0, nil
 		}
@@ -185,23 +184,6 @@ func (this *LocalFile) Read(start int64, b []byte) (n int, err error) {
 	} else {
 		this.FH.Seek(start, io.SeekStart)
 		return this.FH.Read(b)
-	}
-}
-
-//打开文件句柄，作废
-func (this *LocalFile) Open() error {
-	if this.FOpen {
-		return nil
-	}
-	this.FOpen = true
-	//针对已存在的文件，则是打开文件，设置大小为0，并指针指向开头
-	fw, err := os.Open(this.LPath)
-	if err != nil {
-		this.FOpen = false
-		return err
-	} else {
-		this.FH = fw
-		return nil
 	}
 }
 

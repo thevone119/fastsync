@@ -1,33 +1,34 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
+	"github.com/hpcloud/tail"
 	"os"
 	"strings"
 )
 
-func main(){
+func main() {
 	//bolt 库
-	reader:=bufio.NewReader(os.Stdin)
-	for{
-		fmt.Print("$")
-		cmdString,err:=reader.ReadString('\n')
-		if err!=nil{
-			fmt.Fprintln(os.Stderr,err)
-		}
-		runCommand(cmdString)
+	//t, err := tail.TailFile("e:test/test2.txt", tail.Config{Follow: true})
+	filename := "e:/test/test2.txt"
+	t, err := tail.TailFile(filename, tail.Config{Follow: true})
+	if err != nil {
+		fmt.Println(err)
 	}
+	for line := range t.Lines {
+		fmt.Println(line.Text)
+	}
+
 }
 
-func runCommand(commandStr string) error{
-	commandStr=strings.TrimSuffix(commandStr,"\n")
-	arrcmd:=strings.Fields(commandStr)
+func runCommand(commandStr string) error {
+	commandStr = strings.TrimSuffix(commandStr, "\n")
+	arrcmd := strings.Fields(commandStr)
 	switch arrcmd[0] {
 	case "syncup":
-		fmt.Fprintln(os.Stdout,"syncup")
+		fmt.Fprintln(os.Stdout, "syncup")
 	case "testsync":
-		fmt.Fprintln(os.Stdout,"testsync")
+		fmt.Fprintln(os.Stdout, "testsync")
 	}
 	return nil
 }
