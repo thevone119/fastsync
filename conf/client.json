@@ -1,5 +1,7 @@
 {
-  "BasePath":"e:/project",
-  "RemotePath":["easysite|easysite123|127.0.0.1:8999/","easysite|easysite123|127.0.0.1:8999/"]
+  "LocalPath":"e:/project",
+  "LocalPathMonitor": true,
+  "AllowDel": true,
+  "RemotePath":["easysite|easysite123|127.0.0.1:8999/","easysite|easysite123|127.0.0.1:8999/","easysite|easysite123|127.0.0.1:8999/","easysite|easysite123|127.0.0.1:8999/","easysite|easysite123|127.0.0.1:8999/"]
 
 }
