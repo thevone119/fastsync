@@ -39,7 +39,7 @@ func NewFileUpload(nc *NetWork, to int64, fp string) *FileUpload {
 		timeout:            to,
 		RPath:              fp,
 		upLoads:            make(chan *LocalFile, 10),
-		sendFileReqRetChan: make(chan *comm.SendFileReqRetMsg, 10),
+		sendFileReqRetChan: make(chan *comm.SendFileReqRetMsg, 5),
 		sendFileRetChan:    make(chan *comm.SendFileRetMsg, 5),
 		secId:              0,
 	}
@@ -63,9 +63,13 @@ func (n *FileUpload) goupLoadProcess() {
 		select {
 		case data, ok := <-n.upLoads:
 			if ok {
-				n.doUploadChan(data)
+				ret, err := n.doUploadChan(data)
 				//这里对发送完成做处理
+				if ret == 0 {
 
+				} else {
+					zlog.Error(err)
+				}
 			}
 		}
 	}
@@ -109,6 +113,12 @@ func (n *FileUpload) doUploadChan2(l *LocalFile) (byte, error) {
 	if !n.netclient.IsActivity() {
 		return 4, errors.New("服务器连接异常")
 	}
+
+	//每次发送前先清下管道,有效避免管道柱塞
+	if len(n.sendFileReqRetChan) > 0 {
+		<-n.sendFileReqRetChan
+	}
+
 	//1.同步请求，请求服务器，看是否需要上传，如果需要则上传
 	err := n.netclient.SendData(comm.NewSendFileReqMsg(_secId, l.Flen, l.FlastModTime, l.FileMd5, l.cktype, 1, l.RPath).GetMsg())
 	if err != nil {
@@ -153,7 +163,10 @@ func (n *FileUpload) doUploadChan3(fh uint32, l *LocalFile) (byte, error) {
 	var start = int64(0)
 	n.sendFileState = 1
 	n.sendFilePath = l.LPath
-
+	//每次发送，都先清一下管道，避免特殊情况下管道的柱塞
+	if len(n.sendFileRetChan) > 0 {
+		<-n.sendFileRetChan
+	}
 	for {
 		rn, err := l.Read(start, buff)
 		if err != nil && err != io.EOF {
