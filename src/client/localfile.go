@@ -11,16 +11,16 @@ import (
 
 //本地文件处理类，本地文件对应远程文件的处理
 //1.实现路径的转换，本地路径适配，远程路径转换等。
-//2.实现文件读取的缓存处理，
-
+//2.实现文件读取的缓存处理
 //
+
 type localFileHandle struct {
 	fmap  map[string]*LocalFile //filemap
 	llock sync.RWMutex          //读写锁
 }
 
-//最大缓存大小，1M
-var MAX_CACHE_SIZE = int64(1024 * 1000)
+//单个最大缓存大小，1M，超过这个大小，就不缓存了，直接每次读取文件块
+var MAX_CACHE_SIZE = int64(1024 * 1024)
 
 type LocalFile struct {
 	LPath        string             //本机路径（绝对路径）
