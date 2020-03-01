@@ -249,15 +249,15 @@ func (this *RequestRouter) HandleSendFileReq(request ziface.IRequest, data []byt
 		SyncFileHandle.RemoveSyncFile(syncf)
 		return comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 1).GetMsg()
 	case 2:
-		zlog.Info("file not found", freq.Filepath)
+		zlog.Debug("file not found", freq.Filepath)
 		syncf.Open()
 		return comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 0).GetMsg()
 	case 3:
-		zlog.Info("check file is different", freq.Filepath)
+		zlog.Debug("check file is different", freq.Filepath)
 		syncf.Open()
 		return comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 0).GetMsg()
 	case 4:
-		zlog.Info("file not check,upload", freq.Filepath)
+		zlog.Debug("file not check,upload", freq.Filepath)
 		syncf.Open()
 		return comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 0).GetMsg()
 	}
@@ -287,18 +287,12 @@ func (this *SendFileMsgRouter) Handle(request ziface.IRequest) {
 		request.GetConnection().SendBuffMsg(comm.NewSendFileRetMsg(sf.SecId, sf.FileId, sf.Start, 2).GetMsg())
 		return
 	}
-	zlog.Debug("SendFileMsg...", sf.Start)
-	//0:写入成功  1：写入成功，并且已写入结束  2：写入失败
+	//zlog.Debug("SendFileMsg...", sf.Start)
+	//0:未成功，1：成功  2:服务器读写错误 3：传输完成（最后的块都传输完了）
 	wret := syncf.Write(sf)
 	switch wret {
-	case 0:
-		zlog.Debug("write succ...")
-		request.GetConnection().SendBuffMsg(comm.NewSendFileRetMsg(sf.SecId, sf.FileId, sf.Start, 1).GetMsg())
-		return
 	case 1:
-		zlog.Debug("write succ...and write end", syncf.FileAPath)
-		syncf.Close()
-		SyncFileHandle.RemoveSyncFile(syncf)
+		zlog.Debug("write succ...")
 		request.GetConnection().SendBuffMsg(comm.NewSendFileRetMsg(sf.SecId, sf.FileId, sf.Start, 1).GetMsg())
 		return
 	case 2:
@@ -306,6 +300,12 @@ func (this *SendFileMsgRouter) Handle(request ziface.IRequest) {
 		syncf.Close()
 		SyncFileHandle.RemoveSyncFile(syncf)
 		request.GetConnection().SendBuffMsg(comm.NewSendFileRetMsg(sf.SecId, sf.FileId, sf.Start, 2).GetMsg())
+		return
+	case 3:
+		zlog.Debug("write succ...and write end", syncf.FileAPath)
+		syncf.Close()
+		SyncFileHandle.RemoveSyncFile(syncf)
+		request.GetConnection().SendBuffMsg(comm.NewSendFileRetMsg(sf.SecId, sf.FileId, sf.Start, 3).GetMsg())
 		return
 	}
 }

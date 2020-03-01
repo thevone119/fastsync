@@ -249,7 +249,7 @@ func (this *SyncFile) Open() error {
 }
 
 //写文件数据
-//return 0:写入成功  1：写入成功，并且已写入结束  2：写入失败
+//return 0:未成功，1：成功  2:服务器读写错误 3：传输完成（最后的块都传输完了）
 func (this *SyncFile) Write(sf *comm.SendFileMsg) byte {
 	//写锁
 	this.flock.Lock()
@@ -269,10 +269,9 @@ func (this *SyncFile) Write(sf *comm.SendFileMsg) byte {
 	}
 	this.WriteLen += int64(rn)
 	if this.WriteLen >= this.Flen {
-		return 1
+		return 3
 	}
-
-	return 0
+	return 1
 }
 
 //关闭文件句柄
