@@ -1,6 +1,6 @@
 {
   "BasePath":"e:/project2",
   "UserName": "easysite",
-  "PassWord": "easysite123"
-
+  "PassWord": "easysite123",
+  "AllowDel": true
 }
