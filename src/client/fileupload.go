@@ -40,7 +40,7 @@ func NewFileUpload(nc *NetWork, to int64, fp string) *FileUpload {
 		RPath:              fp,
 		upLoads:            make(chan *LocalFile, 10),
 		sendFileReqRetChan: make(chan *comm.SendFileReqRetMsg, 10),
-		sendFileRetChan:    make(chan *comm.SendFileRetMsg, 10),
+		sendFileRetChan:    make(chan *comm.SendFileRetMsg, 5),
 		secId:              0,
 	}
 	//注册一些方法哦
