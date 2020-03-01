@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"sync"
+	"time"
 )
 
 //本地文件处理类，本地文件对应远程文件的处理
@@ -33,18 +34,20 @@ type LocalFile struct {
 	FOpen        bool               //文件是否打开
 	Ferr         error              //文件读写异常
 	FlastModTime int64              //文件的最后修改时间,秒
+	FlastRead    int64              //文件的最后读取时间，秒,用于读超时，超过10秒没有读，就关闭文件流，避免文件卡住哦
 	flock        sync.RWMutex       //读写锁
 }
 
 func NewLocalFile(lp string, rp string, ct comm.CheckFileType) *LocalFile {
 	l := &LocalFile{
-		LPath:   lp,
-		RPath:   rp,
-		cktype:  ct,
-		FOpen:   false,
-		FH:      nil,
-		Ferr:    nil,
-		FileMd5: make([]byte, 16),
+		LPath:     lp,
+		RPath:     rp,
+		cktype:    ct,
+		FOpen:     false,
+		FH:        nil,
+		Ferr:      nil,
+		FileMd5:   make([]byte, 16),
+		FlastRead: 0,
 	}
 	//这里做一些初始化等处理
 	l.init()
@@ -168,6 +171,7 @@ func (this *LocalFile) init() {
 }
 
 func (this *LocalFile) Read(start int64, b []byte) (n int, err error) {
+	this.FlastRead = time.Now().Unix()
 	if this.Flen < MAX_CACHE_SIZE {
 		if start >= this.Flen {
 			return 0, nil

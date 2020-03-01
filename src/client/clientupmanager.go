@@ -16,7 +16,7 @@ import (
 //文件上传管理类，一次上传文件到多个服务器
 type ClientUpManager struct {
 	RemoteUpLoad []*FileUpload //远端的服务器列表
-
+	//发送队列
 	SecId uint32 //序号ID
 }
 

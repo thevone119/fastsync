@@ -89,7 +89,7 @@ func (n *FileUpload) doUploadChan(l *LocalFile) {
 		n.logUploadError(l.LPath, "服务器连接异常")
 		return
 	}
-	//1.同步请求，请求服务器，看是否需要上传，如果需要上传
+	//1.同步请求，请求服务器，看是否需要上传，如果需要则上传
 	err := n.netclient.SendData(comm.NewSendFileReqMsg(_secId, l.Flen, l.FlastModTime, l.FileMd5, l.cktype, 1, l.RPath).GetMsg())
 	if err != nil {
 		n.logUploadError(l.LPath, "服务器连接异常，发送数据失败")
@@ -143,7 +143,6 @@ func (n *FileUpload) doUploadChan2(fh uint32, l *LocalFile) {
 		n.netclient.SendData(comm.NewSendFileMsg(0, fh, start, buff[:rn]).GetMsg())
 		start += int64(rn)
 		//发送过程中，如果已经返回错误了。则直接退出哦
-
 		if n.sendFileState == 3 {
 			n.logUploadError(l.LPath, "文件上中断")
 			break
