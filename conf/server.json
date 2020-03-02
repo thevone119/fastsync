@@ -1,4 +1,6 @@
 {
+  "Host":"0.0.0.0",
+  "TcpPort":8999,
   "BasePath":"e:/project2",
   "UserName": "easysite",
   "PassWord": "easysite123",
