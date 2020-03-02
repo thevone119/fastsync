@@ -95,12 +95,12 @@ func (g *GlobalObj) Reload() {
 func init() {
 	//初始化GlobalObject变量，设置一些默认值
 	GlobalObject = &GlobalObj{
-		Name:             "ZinxServerApp",
-		Version:          "V0.11",
+		Name:             "easysite fastsync",
+		Version:          "V1.11",
 		TcpPort:          8999,
 		Host:             "0.0.0.0",
-		MaxConn:          12000,
-		MaxPacketSize:    10240,
+		MaxConn:          100,
+		MaxPacketSize:    10240, //每个数据包的最大大小，10K
 		ConfFilePath:     "conf/zinx.json",
 		WorkerPoolSize:   10,
 		MaxWorkerTaskLen: 1024,
