@@ -8,6 +8,7 @@ import (
 	"os"
 	"sync"
 	"time"
+	"utils"
 )
 
 //本地文件处理类，本地文件对应远程文件的处理
@@ -24,6 +25,7 @@ type localFileHandle struct {
 var MAX_CACHE_SIZE = int64(1024 * 1024)
 
 type LocalFile struct {
+	Lid          uint32             //主键
 	LPath        string             //本机路径（绝对路径）
 	RPath        string             //远程路径（远程的相对路径）
 	cktype       comm.CheckFileType //文件校验类型
@@ -40,6 +42,7 @@ type LocalFile struct {
 
 func NewLocalFile(lp string, rp string, ct comm.CheckFileType) *LocalFile {
 	l := &LocalFile{
+		Lid:       utils.GetNextUint(),
 		LPath:     lp,
 		RPath:     rp,
 		cktype:    ct,
@@ -56,7 +59,7 @@ func NewLocalFile(lp string, rp string, ct comm.CheckFileType) *LocalFile {
 }
 
 //0:不校验  1:size校验 2:fastmd5  3:fullmd5
-//初始化一些数据
+//初始化一些数据,这里考虑下异常，外层考虑吧
 func (this *LocalFile) init() {
 	this.FOpen = true
 	//针对已存在的文件，则是打开文件，设置大小为0，并指针指向开头
@@ -197,5 +200,6 @@ func (this *LocalFile) Close() {
 	if this.FH != nil {
 		this.FH.Close()
 		this.FH = nil
+		this.CacheFile = nil
 	}
 }

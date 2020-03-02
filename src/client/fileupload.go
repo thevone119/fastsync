@@ -63,6 +63,7 @@ func (n *FileUpload) goupLoadProcess() {
 		select {
 		case data, ok := <-n.upLoads:
 			if ok {
+				//这个无论如何必须有返回
 				ret, err := n.doUploadChan(data)
 				//这里对发送完成做处理
 				if ret == 0 {
@@ -86,6 +87,7 @@ func (n *FileUpload) sendEndCallBack() {
 func (n *FileUpload) doUploadChan(l *LocalFile) (retb byte, err error) {
 	//错误拦截,针对上传过程中遇到的错误进行拦截，避免出现意外错误，程序退出
 	defer func() {
+		SyncFileWG.Done()
 		//恢复程序的控制权
 		if p := recover(); p != nil {
 			str, ok := p.(string)

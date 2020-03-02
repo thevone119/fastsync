@@ -5,6 +5,8 @@ import (
 	"io/ioutil"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 	"zinx/zlog"
 )
 
@@ -12,6 +14,9 @@ import (
 //1.新增，修改本机文件
 //2.删除本机文件
 //3.
+
+//定义全局的upload线程等待，只有等待到所有的线程结束，才推出
+var SyncFileWG sync.WaitGroup
 
 //文件上传管理类，一次上传文件到多个服务器
 type ClientUpManager struct {
@@ -48,7 +53,8 @@ func srtToFileUpload(str string) *FileUpload {
 }
 
 //同步某个目录到服务器中去/包括目录下的所有文件
-func (c *ClientUpManager) SyncPath(lp string) {
+func (c *ClientUpManager) SyncPath(ltime int64, lp string, filecheck comm.CheckFileType) {
+
 	if strings.LastIndex(lp, "/") == len(lp)-1 && len(lp) > 0 {
 		lp = lp[0 : len(lp)-1]
 	}
@@ -60,18 +66,25 @@ func (c *ClientUpManager) SyncPath(lp string) {
 	for _, fi := range rd {
 		if fi.IsDir() { // 如果是目录，则回调
 			fullDir := lp + "/" + fi.Name()
-			c.SyncPath(fullDir)
+			c.SyncPath(ltime, fullDir, filecheck)
 			continue
 		} else {
 			fullName := lp + "/" + fi.Name()
-			c.SyncFile(fullName, 2)
+			c.SyncFile(ltime, fullName, filecheck)
 		}
 	}
 }
 
 //同步某个文件到服务器,本机文件新增，修改的时候，就调用这个方法
 //cktype:文件的校验类型 //0:不校验  1:size校验 2:fastmd5  3:fullmd5
-func (c *ClientUpManager) SyncFile(lp string, cktype comm.CheckFileType) {
+func (c *ClientUpManager) SyncFile(ltime int64, lp string, cktype comm.CheckFileType) {
+	//错误拦截,针对上传过程中遇到的错误进行拦截，避免出现意外错误，程序退出
+	defer func() {
+		//恢复程序的控制权
+		if p := recover(); p != nil {
+			zlog.Error("文件上传处理发生意外错误", p, lp)
+		}
+	}()
 	zlog.Debug("SyncFile..", lp)
 	//1.读取判断本地文件是否存在，大小，MD5等
 	rlp, err := ClientConfigObj.GetRelativePath(lp)
@@ -80,6 +93,10 @@ func (c *ClientUpManager) SyncFile(lp string, cktype comm.CheckFileType) {
 		return
 	}
 	ul := NewLocalFile(lp, rlp, cktype)
+	//
+	if ltime > 0 && (time.Now().Unix()-ul.FlastModTime) > ltime {
+		return
+	}
 	for _, fu := range c.RemoteUpLoad {
 		fu.SendUpload(ul)
 	}
