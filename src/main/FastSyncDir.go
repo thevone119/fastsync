@@ -25,20 +25,14 @@ func main() {
 	flag.IntVar(&filecheck, "c", 0, "同步文件校验类型，默认3(完整的MD5校验)")
 	// 解析命令行参数写入注册的flag里
 	flag.Parse()
-	zlog.Info("开始执行全量文件同步，同步时间:", ltime, "同步路径:", "文件校验类型:", filecheck)
-	//计算耗时，XX毫秒
-	currTime := time.Now().UnixNano() / 1e6
-	start(ltime, lpath, comm.CheckFileType(1))
-	zlog.Info("全量文件同步文件同步执行完成，耗时:", time.Now().UnixNano()/1e6-currTime, "毫秒")
-}
+	zlog.Info("开始执行全量文件同步，同步时间:", ltime, "秒，同步路径:", "文件校验类型:", filecheck)
 
-func start(ltime int64, lpath string, filecheck comm.CheckFileType) {
+	t1 := time.Now()
+
 	c := client.NewClientUpManager()
+	c.SyncPath(ltime, lpath, comm.CheckFileType(filecheck))
+	//阻塞等待所有上传文件结束
+	client.SyncFileWG.Wait()
 
-	for {
-		//c.SyncPath("D:/code")
-		c.SyncPath("e:/project/")
-		time.Sleep(time.Second * 60 * 5)
-	}
-
+	zlog.Info("全量文件同步文件同步执行完成，耗时:", time.Now().Sub(t1))
 }
