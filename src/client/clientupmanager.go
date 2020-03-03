@@ -2,7 +2,8 @@ package client
 
 import (
 	"comm"
-	"io/ioutil"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -53,31 +54,29 @@ func srtToFileUpload(str string) *FileUpload {
 }
 
 //同步某个目录到服务器中去/包括目录下的所有文件
+//ltime: 秒哦
 func (c *ClientUpManager) SyncPath(ltime int64, lp string, filecheck comm.CheckFileType) {
-
-	if strings.LastIndex(lp, "/") == len(lp)-1 && len(lp) > 0 {
-		lp = lp[0 : len(lp)-1]
-	}
-	rd, err := ioutil.ReadDir(lp)
-	if err != nil {
-		return
-	}
-
-	for _, fi := range rd {
-		if fi.IsDir() { // 如果是目录，则回调
-			fullDir := lp + "/" + fi.Name()
-			c.SyncPath(ltime, fullDir, filecheck)
-			continue
-		} else {
-			fullName := lp + "/" + fi.Name()
-			c.SyncFile(ltime, fullName, filecheck)
+	//Walk函数会遍历root指定的目录下的文件树，对每一个该文件树中的目录和文件都会调用walkFn，包括root自身。
+	//所有访问文件/目录时遇到的错误都会传递给walkFn过滤。文件是按词法顺序遍历的，这让输出更漂亮，但也导致处理非常大的目录时效率会降低。
+	//Walk函数不会遍历文件树中的符号链接（快捷方式）文件包含的路径。
+	currtime := time.Now().Unix()
+	filepath.Walk(lp, func(path string, info os.FileInfo, err error) error {
+		//这里判断是否为目录，只需监控目录即可
+		//目录下的文件也在监控范围内，不需要我们一个一个加
+		if info.IsDir() {
+			return nil
 		}
-	}
+		if ltime > 0 && (currtime-info.ModTime().Unix()) > ltime {
+			return nil
+		}
+		c.SyncFile(path, filecheck)
+		return nil
+	})
 }
 
 //同步某个文件到服务器,本机文件新增，修改的时候，就调用这个方法
 //cktype:文件的校验类型 //0:不校验  1:size校验 2:fastmd5  3:fullmd5
-func (c *ClientUpManager) SyncFile(ltime int64, lp string, cktype comm.CheckFileType) {
+func (c *ClientUpManager) SyncFile(lp string, cktype comm.CheckFileType) {
 	//错误拦截,针对上传过程中遇到的错误进行拦截，避免出现意外错误，程序退出
 	defer func() {
 		//恢复程序的控制权
@@ -93,10 +92,6 @@ func (c *ClientUpManager) SyncFile(ltime int64, lp string, cktype comm.CheckFile
 		return
 	}
 	ul := NewLocalFile(lp, rlp, cktype)
-	//
-	if ltime > 0 && (time.Now().Unix()-ul.FlastModTime) > ltime {
-		return
-	}
 	for _, fu := range c.RemoteUpLoad {
 		fu.SendUpload(ul)
 	}

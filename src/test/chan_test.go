@@ -3,6 +3,8 @@ package test
 import (
 	"errors"
 	"fmt"
+	"path"
+	"path/filepath"
 	"testing"
 	"zinx/zlog"
 )
@@ -21,6 +23,14 @@ func TestChan(t *testing.T) {
 	fmt.Println("ch len:", len(ch))
 	n, err := doUploadChan()
 	fmt.Println("ch len:", n, err)
+	testpath()
+}
+
+func testpath() {
+
+	fmt.Println("path:", path.Ext("d:/sal.dfj/daf.txt"))
+	s, _ := filepath.EvalSymlinks("D:/video///[BT200.COM][新金瓶梅3D][720P高清完整版][3.49GB]/d.tt")
+	fmt.Println("path:", s)
 }
 
 func doUploadChan() (retb byte, err error) {

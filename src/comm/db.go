@@ -37,7 +37,7 @@ func init() {
 	FileDB.DBPath = path + ".db"
 }
 
-//只开，不关，只有一个应用使用，引用退出，自动就退出了
+//只开，不关，只有一个应用使用，应用退出，自动就退出关闭了
 func (f *filedb) Open() {
 	if f.isopen {
 		return

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"os"
-	"strings"
+	"path"
 )
 
 //文件校验类型定义
@@ -34,17 +34,7 @@ func PathExists(path string) (bool, error) {
 
 //路径连接，串联
 func AppendPath(p1 string, p2 string) string {
-	if strings.LastIndex(p1, "/") == len(p1)-1 && len(p1) > 0 {
-		p1 = p1[0 : len(p1)-1]
-	}
-	if strings.LastIndex(p2, "/") == len(p2)-1 && len(p2) > 0 {
-		p2 = p2[0 : len(p2)-1]
-	}
-
-	if strings.Index(p2, "/") == 0 {
-		p2 = p2[1:]
-	}
-	return p1 + "/" + p2
+	return path.Join(p1, p2)
 }
 
 //整形转换成字节
