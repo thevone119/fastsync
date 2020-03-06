@@ -3,8 +3,10 @@ package comm
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"github.com/boltdb/bolt"
 	"os"
+	"sync"
 	"time"
 	"zinx/zlog"
 )
@@ -18,6 +20,10 @@ type filedb struct {
 	DBPath string
 	db     *bolt.DB
 	isopen bool
+	lastWriteTime time.Time
+	tx     *bolt.Tx
+	istx bool
+	lock        sync.RWMutex
 }
 
 /*
@@ -28,6 +34,7 @@ func init() {
 	//每个进程一个数据库文件。不能开多个进程，否则就会发生数据文件锁哦，这个数据文件无法多个进程共享的
 	FileDB = &filedb{
 		DBPath: "fastsync.db",
+		lastWriteTime:time.Now(),
 	}
 	path, err := os.Executable()
 	if err != nil {
@@ -51,46 +58,114 @@ func (f *filedb) Open() {
 	f.db = db
 	f.isopen = true
 }
+func (f *filedb) Close(){
+	if !f.isopen {
+		return
+	}
+	if f.istx{
+		f.tx.Commit()
+		f.istx=false
+	}
+	f.db.Close()
+	f.isopen=false
+}
+
+//创建数据库桶
+func (f *filedb) CreateBucketIfNotExists(buc string){
+	// Create a bucket using a read-write transaction.
+	if err :=  f.db.Update(func(tx *bolt.Tx) error {
+	_, err := tx.CreateBucketIfNotExists([]byte(buc))
+	return err
+	});
+	err != nil {
+		//log.Fatal(err)
+		zlog.Error(err)
+	}
+}
+
+func (f *filedb) GetDB()  *bolt.DB{
+	return f.db
+}
+
+func (f *filedb) Begin(){
+	if !f.isopen{
+		return
+	}
+	if !f.istx{
+		f.tx,_ = f.db.Begin(true)
+		f.istx = true
+		f.lastWriteTime = time.Now()
+	}
+}
+
+//3秒最多提交一次
+func (f *filedb) Commit(){
+	if !f.isopen{
+		return
+	}
+	if f.istx && time.Now().Sub(f.lastWriteTime)>time.Second*3{
+		f.tx.Commit()
+		f.istx=false
+	}
+}
+
+
+
 
 func (f *filedb) PutString(bucket string, key string, value string) error {
-	err := f.db.Update(func(tx *bolt.Tx) error {
-		// 创建一个桶
-		b, err := tx.CreateBucketIfNotExists([]byte(bucket))
-		if err != nil {
-			zlog.Error("filedb PutString err", err)
-			return err
-		}
-		err = b.Put([]byte(key), []byte(value))
-		if err != nil {
-			zlog.Error("filedb PutString2 err", err)
-			return err
-		}
-		return nil
-	})
-	return err
+	if !f.isopen{
+		return errors.New("not open db")
+	}
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	f.Begin()
+	defer f.Commit()
+	// 创建一个桶
+	b, err := f.tx.CreateBucketIfNotExists([]byte(bucket))
+	if err != nil {
+		zlog.Error("filedb PutString err", err)
+		return err
+	}
+	err = b.Put([]byte(key), []byte(value))
+	if err != nil {
+		zlog.Error("filedb PutString2 err", err)
+		return err
+	}
+	return nil
 }
 
 func (f *filedb) PutInt64(bucket string, key string, value int64) error {
-	err := f.db.Update(func(tx *bolt.Tx) error {
-		// 创建一个桶
-		b, err := tx.CreateBucketIfNotExists([]byte(bucket))
-		if err != nil {
-			zlog.Error("filedb PutString err", err)
-			return err
-		}
-		bytesBuffer := bytes.NewBuffer([]byte{})
-		binary.Write(bytesBuffer, binary.BigEndian, value)
-		err = b.Put([]byte(key), bytesBuffer.Bytes())
-		if err != nil {
-			zlog.Error("filedb PutString2 err", err)
-			return err
-		}
-		return nil
-	})
+	if !f.isopen{
+		return errors.New("not open db")
+	}
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	f.Begin()
+	defer f.Commit()
+
+	// 创建一个桶
+	b, err := f.tx.CreateBucketIfNotExists([]byte(bucket))
+	if err != nil {
+		zlog.Error("filedb PutInt64 err", err)
+		return err
+	}
+	bytesBuffer := bytes.NewBuffer([]byte{})
+	binary.Write(bytesBuffer, binary.BigEndian, value)
+
+	err = b.Put([]byte(key), bytesBuffer.Bytes())
+	if err != nil {
+		zlog.Error("filedb PutInt642 err", err)
+		return err
+	}
 	return err
 }
 
 func (f *filedb) GetString(bucket string, key string) (string, error) {
+	if !f.isopen{
+		return "",errors.New("not open db")
+	}
+	f.lock.RLock()
+	defer f.lock.RUnlock()
 	var ret = ""
 	err := f.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucket))
@@ -105,6 +180,11 @@ func (f *filedb) GetString(bucket string, key string) (string, error) {
 }
 
 func (f *filedb) GetInt64(bucket string, key string) (int64, error) {
+	if !f.isopen{
+		return int64(-1),errors.New("not open db")
+	}
+	f.lock.RLock()
+	defer f.lock.RUnlock()
 	var ret = int64(-1)
 	err := f.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucket))
@@ -122,13 +202,14 @@ func (f *filedb) GetInt64(bucket string, key string) (int64, error) {
 }
 
 func (f *filedb) RemoveString(bucket string, key string) error {
-	err := f.db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(bucket))
-		if b == nil {
-			return nil
-		}
-		b.Delete([]byte(key))
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	f.Begin()
+	defer f.Commit()
+
+	b := f.tx.Bucket([]byte(bucket))
+	if b == nil {
 		return nil
-	})
-	return err
+	}
+	return b.Delete([]byte(key))
 }
