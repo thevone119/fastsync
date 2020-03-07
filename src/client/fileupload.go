@@ -88,6 +88,7 @@ func (n *FileUpload) doUploadChan(l *LocalFile) (retb byte, err error) {
 	//错误拦截,针对上传过程中遇到的错误进行拦截，避免出现意外错误，程序退出
 	defer func() {
 		SyncFileWG.Done()
+		l.OneUploadEnd()
 		//恢复程序的控制权
 		if p := recover(); p != nil {
 			str, ok := p.(string)

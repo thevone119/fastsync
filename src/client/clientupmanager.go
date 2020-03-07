@@ -2,6 +2,7 @@ package client
 
 import (
 	"comm"
+	"container/list"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -24,20 +25,26 @@ type ClientUpManager struct {
 	RemoteUpLoad []*FileUpload //远端的服务器列表
 	//发送队列
 	SecId uint32 //序号ID
+	//所有的文件上传类记录在这里，用携程去监控上传类是否上传完成，完成了则需要关闭并且释放资源
+	lfileList *list.List
 }
 
 //装载所有的配置，启动所有的客户端监听，保持长连接
 func NewClientUpManager() *ClientUpManager {
 	cm := &ClientUpManager{
 		RemoteUpLoad: make([]*FileUpload, len(ClientConfigObj.RemotePath)),
+		lfileList:list.New(),
 	}
 
 	//装置客户端上传类
 	for i := 0; i < len(ClientConfigObj.RemotePath); i++ {
 		cm.RemoteUpLoad[i] = srtToFileUpload(ClientConfigObj.RemotePath[i])
 	}
+	//开携程，处理清理工作
+	go cm.goCloseLocalFile()
 	return cm
 }
+
 
 //通过str构建一个fileUpload对象
 //username|pwd|127.0.0.1:9001/
@@ -92,6 +99,11 @@ func (c *ClientUpManager) SyncFile(lp string, cktype comm.CheckFileType) {
 		return
 	}
 	ul := NewLocalFile(lp, rlp, cktype)
+	//加入等待，全局等待
+	SyncFileWG.Add(len(c.RemoteUpLoad))
+	ul.AddWait(len(c.RemoteUpLoad))
+	//放入这个监控队列
+	c.lfileList.PushBack(ul)
 	for _, fu := range c.RemoteUpLoad {
 		fu.SendUpload(ul)
 	}
@@ -157,5 +169,22 @@ func (c *ClientUpManager) Close() {
 	//装置客户端上传类
 	for _, fu := range c.RemoteUpLoad {
 		fu.netclient.Disconnect()
+	}
+}
+
+//采用携程关闭本地文件，释放资源
+func (c *ClientUpManager) goCloseLocalFile(){
+	//1秒轮训
+	for{
+		if c.lfileList.Len()>0{
+			var next *list.Element
+			for e := c.lfileList.Front(); e != nil; e = next {
+				next = e.Next()
+				if e.Value.(*LocalFile).CheckAndClose(){
+					c.lfileList.Remove(e)
+				}
+			}
+		}
+		time.Sleep(time.Second*1)
 	}
 }

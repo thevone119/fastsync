@@ -14,9 +14,9 @@ import (
 //用bolt做的简单的key/value存储
 
 //全局变量，直接使用
-var FileDB *filedb
+var BoltDB *boltDB
 
-type filedb struct {
+type boltDB struct {
 	DBPath string
 	db     *bolt.DB
 	isopen bool
@@ -32,7 +32,7 @@ type filedb struct {
 func init() {
 	//初始化全局变量，设置一些默认值
 	//每个进程一个数据库文件。不能开多个进程，否则就会发生数据文件锁哦，这个数据文件无法多个进程共享的
-	FileDB = &filedb{
+	BoltDB = &boltDB{
 		DBPath: "fastsync.db",
 		lastWriteTime:time.Now(),
 	}
@@ -41,11 +41,11 @@ func init() {
 		zlog.Error("open db error")
 		return
 	}
-	FileDB.DBPath = path + ".db"
+	BoltDB.DBPath = path + ".boltdb"
 }
 
 //只开，不关，只有一个应用使用，应用退出，自动就退出关闭了
-func (f *filedb) Open() {
+func (f *boltDB) Open() {
 	if f.isopen {
 		return
 	}
@@ -54,11 +54,11 @@ func (f *filedb) Open() {
 		zlog.Error("open db err", err)
 		return
 	}
-	zlog.Info(FileDB.DBPath, " open")
+	zlog.Info(BoltDB.DBPath, " open")
 	f.db = db
 	f.isopen = true
 }
-func (f *filedb) Close(){
+func (f *boltDB) Close(){
 	if !f.isopen {
 		return
 	}
@@ -71,7 +71,7 @@ func (f *filedb) Close(){
 }
 
 //创建数据库桶
-func (f *filedb) CreateBucketIfNotExists(buc string){
+func (f *boltDB) CreateBucketIfNotExists(buc string){
 	// Create a bucket using a read-write transaction.
 	if err :=  f.db.Update(func(tx *bolt.Tx) error {
 	_, err := tx.CreateBucketIfNotExists([]byte(buc))
@@ -83,11 +83,11 @@ func (f *filedb) CreateBucketIfNotExists(buc string){
 	}
 }
 
-func (f *filedb) GetDB()  *bolt.DB{
+func (f *boltDB) GetDB()  *bolt.DB{
 	return f.db
 }
 
-func (f *filedb) Begin(){
+func (f *boltDB) Begin(){
 	if !f.isopen{
 		return
 	}
@@ -99,7 +99,7 @@ func (f *filedb) Begin(){
 }
 
 //3秒最多提交一次
-func (f *filedb) Commit(){
+func (f *boltDB) Commit(){
 	if !f.isopen{
 		return
 	}
@@ -108,12 +108,20 @@ func (f *filedb) Commit(){
 		f.istx=false
 	}
 }
+func (f *boltDB) ForceCommit(){
+	if f.istx{
+		f.tx.Commit()
+		f.istx=false
+	}
+}
 
 
 
 
-func (f *filedb) PutString(bucket string, key string, value string) error {
+
+func (f *boltDB) PutString(bucket string, key string, value string) error {
 	if !f.isopen{
+		zlog.Error("filedb not open db")
 		return errors.New("not open db")
 	}
 	f.lock.Lock()
@@ -134,7 +142,7 @@ func (f *filedb) PutString(bucket string, key string, value string) error {
 	return nil
 }
 
-func (f *filedb) PutInt64(bucket string, key string, value int64) error {
+func (f *boltDB) PutInt64(bucket string, key string, value int64) error {
 	if !f.isopen{
 		return errors.New("not open db")
 	}
@@ -160,7 +168,7 @@ func (f *filedb) PutInt64(bucket string, key string, value int64) error {
 	return err
 }
 
-func (f *filedb) GetString(bucket string, key string) (string, error) {
+func (f *boltDB) GetString(bucket string, key string) (string, error) {
 	if !f.isopen{
 		return "",errors.New("not open db")
 	}
@@ -173,13 +181,13 @@ func (f *filedb) GetString(bucket string, key string) (string, error) {
 			return nil
 		}
 		v := b.Get([]byte(key))
-		ret = string(v[:])
+		ret = string(v)
 		return nil
 	})
 	return ret, err
 }
 
-func (f *filedb) GetInt64(bucket string, key string) (int64, error) {
+func (f *boltDB) GetInt64(bucket string, key string) (int64, error) {
 	if !f.isopen{
 		return int64(-1),errors.New("not open db")
 	}
@@ -201,7 +209,7 @@ func (f *filedb) GetInt64(bucket string, key string) (int64, error) {
 	return ret, err
 }
 
-func (f *filedb) RemoveString(bucket string, key string) error {
+func (f *boltDB) RemoveString(bucket string, key string) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	f.Begin()

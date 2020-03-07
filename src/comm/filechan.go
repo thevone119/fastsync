@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"zinx/zlog"
 )
 
 //1.实现文件的流式读取。
@@ -30,50 +31,65 @@ func NewFileChan(d string, p string) *FileChan {
 		LineChan: make(chan string, 100),
 		isExit:   false,
 	}
-	go f.goHandle()
 	return f
+}
+
+func (f *FileChan) Start(){
+	go f.goHandle()
 }
 
 //携程轮询处理
 func (f *FileChan) goHandle() {
 	for {
-		//通过Walk来遍历目录下f的所有子目录
-		filepath.Walk(f.dir, func(p string, info os.FileInfo, err error) error {
-			if info.IsDir() {
-				return nil
-			}
-			if f.isExit {
-				return nil
-			}
-			m, _ := filepath.Match(f.pattern, info.Name())
-			if !m {
-				return nil
-			}
-			//获取文件
-			fl := NewFileLine(p)
-			if fl.FlastRedTime > info.ModTime().UnixNano() {
-				return nil
-			}
-			fl.FlastRedTime = time.Now().UnixNano()
-			fl.open()
-			l, err := fl.ReadLines()
-			if err != nil {
-				return nil
-				//出错了,
-			} else {
-				for i := l.Front(); i != nil; i = i.Next() {
-					f.LineChan <- i.Value.(string)
-				}
-			}
-
-			return nil
-		})
 		if f.isExit {
 			return
 		}
-		//1秒轮询
-		time.Sleep(time.Second)
+		f.goHandle2()
 	}
+}
+
+func (f *FileChan) goHandle2(){
+	//这里避免线程轮训失败，失败后重新轮训
+	defer func() {
+		//恢复程序的控制权
+		if p := recover(); p != nil {
+			zlog.Error("文件监控轮训发生错误，3秒后重启轮训", p,f.dir)
+			time.Sleep(time.Second*1)
+		}
+	}()
+	//通过Walk来遍历目录下f的所有子目录
+	filepath.Walk(f.dir, func(p string, info os.FileInfo, err error) error {
+		if info.IsDir() {
+			return nil
+		}
+		if f.isExit {
+			return nil
+		}
+		m, _ := filepath.Match(f.pattern, info.Name())
+		if !m {
+			return nil
+		}
+		//获取文件
+		fl := NewFileLine(p)
+		if fl.FlastRedTime > info.ModTime().UnixNano() {
+			return nil
+		}
+		fl.FlastRedTime = time.Now().UnixNano()
+		fl.open()
+		l, err := fl.ReadLines()
+		if err != nil {
+			return nil
+			//出错了,
+		} else {
+			for i := l.Front(); i != nil; i = i.Next() {
+				f.LineChan <- i.Value.(string)
+			}
+		}
+
+		return nil
+	})
+	//1秒轮询
+	time.Sleep(time.Second)
 }
 
 //关闭所有文件，管道
@@ -91,7 +107,6 @@ type FileLine struct {
 	FOpen        bool     //文件是否打开
 	filestart    int64    //当前文件位置，这个保存到数据库中的。
 	FH           *os.File //本机文件指针,只读方式打开
-	reader       *bufio.Reader
 }
 
 func NewFileLine(fp string) *FileLine {
@@ -105,8 +120,9 @@ func NewFileLine(fp string) *FileLine {
 		filestart:    0,
 		FlastModTime: 0,
 	}
-	s,err:=FileDB.GetInt64("FileLine",fp)
-	if err!=nil&&s>0{
+	s,err:=LeveldbDB.GetInt64([]byte("FL_"+fp))
+
+	if err==nil&&s>0{
 		fl.filestart=s
 	}
 	_file_line_map[fp] = fl
@@ -124,7 +140,6 @@ func (f *FileLine) open() {
 	} else {
 		f.FH = fr
 		f.FOpen = true
-		f.reader = bufio.NewReader(f.FH)
 	}
 }
 
@@ -139,26 +154,15 @@ func (f *FileLine) close() {
 	}
 }
 
+//一次读取多行
 func (f *FileLine) ReadLines() (*list.List, error) {
+	retl := list.New()
+	if !f.FOpen {
+		return retl, errors.New("file on open")
+	}
 	f.open()
 	defer f.close()
-	retl := list.New()
-	for {
-		l, err := f.ReadLine()
-		if err != nil {
-			break
-		}
-		retl.PushBack(l)
-	}
-	FileDB.PutInt64("FileLine",f.fp,f.filestart)
-	return retl, nil
-}
-
-//读取某行
-func (f *FileLine) ReadLine() (string, error) {
-	if !f.FOpen {
-		return "", errors.New("file on open")
-	}
+	//
 	//超过最大的，就是文件被重置了。重新来读
 	if f.filestart > 0 {
 		len, _ := f.FH.Seek(0, io.SeekEnd)
@@ -169,17 +173,20 @@ func (f *FileLine) ReadLine() (string, error) {
 	sk, err := f.FH.Seek(f.filestart, io.SeekStart)
 	//超标
 	if err != nil {
-		return "", err
+		return retl, err
 	}
-	f.reader.Reset(f.FH)
+	bf:=bufio.NewReader(f.FH)
 
-	l, err := f.reader.ReadString('\n')
-	if err != nil {
-		return "", err
+	for {
+		l, err := bf.ReadString('\n')
+		if err != nil {
+			break
+		}
+		retl.PushBack(strings.TrimRight(l, "\n"))
 	}
 	sk, _ = f.FH.Seek(0, io.SeekCurrent)
-	sk -= int64(f.reader.Buffered())
 	f.filestart = sk
-
-	return strings.TrimRight(l, "\n"), nil
+	LeveldbDB.PutInt64([]byte("FL_"+f.fp),f.filestart)
+	return retl, nil
 }
+

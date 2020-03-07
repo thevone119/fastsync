@@ -7,7 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"strings"
+	"path/filepath"
 	"sync"
 	"time"
 	"utils"
@@ -398,7 +398,7 @@ func (this *MoveFileRouter) Handle(request ziface.IRequest) {
 		err = this.copyDir(srcFileAPath, dstFileAPath, rmsrc)
 	} else {
 		//先创建目录，再复制
-		os.MkdirAll(dstFileAPath[:strings.LastIndex(dstFileAPath, "/")], os.ModePerm)
+		os.MkdirAll(filepath.Dir(dstFileAPath), 0775)
 		err = this.copyFile(srcFileAPath, dstFileAPath, rmsrc)
 	}
 	if err != nil {
@@ -416,7 +416,7 @@ func (this *MoveFileRouter) copyDir(src string, dst string, rmsrc bool) error {
 		return err
 	}
 	//创建目标目录，如果存在则不创建，不存在则创建
-	os.MkdirAll(dst, os.ModePerm)
+	os.MkdirAll(dst, 0755)
 	for _, fi := range rd {
 		if fi.IsDir() { // 如果是目录，则回调
 			this.copyDir(src+"/"+fi.Name(), dst+"/"+fi.Name(), rmsrc)

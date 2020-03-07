@@ -6,13 +6,13 @@ import (
 )
 
 func TestFilechan(t *testing.T) {
+	LeveldbDB.Open()
 	f := NewFileChan("E:/TEST/test2", "*.txt")
-	FileDB.Open()
+	f.Start()
 	for {
 		select {
 		case l := <-f.LineChan:
 			fmt.Println(l)
-			FileDB.Commit()
 		}
 	}
 

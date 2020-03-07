@@ -4,6 +4,7 @@ import (
 	"comm"
 	"crypto/md5"
 	"encoding/binary"
+	"errors"
 	"io"
 	"os"
 	"sync"
@@ -38,6 +39,8 @@ type LocalFile struct {
 	FlastModTime int64              //文件的最后修改时间,秒
 	FlastRead    int64              //文件的最后读取时间，秒,用于读超时，超过10秒没有读，就关闭文件流，避免文件卡住哦
 	flock        sync.RWMutex       //读写锁
+
+	fWait int		//正在进行上传的文件个数，如果个数等于0，则关闭文件,释放资源哦
 }
 
 func NewLocalFile(lp string, rp string, ct comm.CheckFileType) *LocalFile {
@@ -51,6 +54,7 @@ func NewLocalFile(lp string, rp string, ct comm.CheckFileType) *LocalFile {
 		Ferr:      nil,
 		FileMd5:   make([]byte, 16),
 		FlastRead: 0,
+		fWait:0,
 	}
 	//这里做一些初始化等处理
 	l.init()
@@ -189,9 +193,29 @@ func (this *LocalFile) Read(start int64, b []byte) (n int, err error) {
 		}
 		return int(readnum), nil
 	} else {
+		if !this.FOpen{
+			n=0
+			err= errors.New("file is close")
+			return
+		}
+		this.flock.RLock()
+		defer this.flock.RUnlock()
 		this.FH.Seek(start, io.SeekStart)
 		return this.FH.Read(b)
 	}
+}
+
+func (this *LocalFile) AddWait(count int){
+	this.flock.Lock()
+	defer this.flock.Unlock()
+	this.fWait+=count
+}
+
+//某个上传已经结束
+func (this *LocalFile) OneUploadEnd(){
+	this.flock.Lock()
+	defer this.flock.Unlock()
+	this.fWait--
 }
 
 //关闭文件句柄
@@ -202,4 +226,22 @@ func (this *LocalFile) Close() {
 		this.FH = nil
 		this.CacheFile = nil
 	}
+}
+
+//检测关闭方法，2秒检测一次
+//如果FWait<=0,直接关闭
+//如果最后读取时间超过10+FWait秒没有读取，则作为超时关闭
+func (this *LocalFile) CheckAndClose() bool{
+	if this.FlastRead==0{
+		return false
+	}
+	if this.fWait<=0{
+		this.Close()
+		return true
+	}
+	if this.FlastRead+int64(this.fWait)+10 < time.Now().Unix(){
+		this.Close()
+		return true
+	}
+	return false
 }

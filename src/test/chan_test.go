@@ -28,8 +28,8 @@ func TestChan(t *testing.T) {
 
 func testpath() {
 
-	fmt.Println("path:", path.Ext("d:/sal.dfj/daf.txt"))
-	s, _ := filepath.EvalSymlinks("D:/video///[BT200.COM][新金瓶梅3D][720P高清完整版][3.49GB]/d.tt")
+	fmt.Println("path:", path.Dir("d:/sal.dfj"))
+	s, _ := filepath.EvalSymlinks("D:/video//d.tt")
 	fmt.Println("path:", s)
 }
 

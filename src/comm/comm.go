@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 	"os"
 	"path"
+	"path/filepath"
+	"zinx/zlog"
 )
 
 //文件校验类型定义
@@ -19,6 +21,31 @@ const (
 	FCHECK_SIZE_AND_TIME_CHECK = CheckFileType(4) //校验大小，如果大小一样，则校验时间，如果时间较新，则更新（用于全量快速同步）
 )
 
+//定义一些全局变量，方便读取
+var CURR_PID=os.Getpid()//当前启动的进程ID
+var CURR_RUN_PATH=""	//当前运行程序目录  /home/ap/ccb/nitify
+var CURR_RUN_NAME=""	//当前运行程序名称	xxx.exe
+
+var NOTIFY_PATH = "notifylog"	//日志监控目录，没有则自动创建
+
+/*
+	提供init方法，默认加载
+*/
+func init() {
+	//初始化全局变量，设置一些默认值
+	path, err := os.Executable()
+	if err != nil {
+		zlog.Error("获取程序运行目录出错",err)
+	}else{
+		CURR_RUN_PATH = filepath.Dir(path)
+		CURR_RUN_NAME=filepath.Base(path)
+		//日志监控目录，没有则自动创建
+		NOTIFY_PATH=filepath.Join(CURR_RUN_PATH,"notifylog")
+		os.MkdirAll(NOTIFY_PATH,0775)
+	}
+
+}
+
 //判断一个文件是否存在
 func PathExists(path string) (bool, error) {
 	_, err := os.Stat(path)
@@ -30,6 +57,28 @@ func PathExists(path string) (bool, error) {
 	}
 
 	return false, err
+}
+
+//判断文件是否存在
+func checkFileExist(filename string) bool {
+	exist := true
+	if _, err := os.Stat(filename); os.IsNotExist(err) {
+		exist = false
+	}
+	return exist
+}
+
+func Mkdir(dir string) (e error) {
+	_, er := os.Stat(dir)
+	b := er == nil || os.IsExist(er)
+	if !b {
+		if err := os.MkdirAll(dir, 0775); err != nil {
+			if os.IsPermission(err) {
+				e = err
+			}
+		}
+	}
+	return
 }
 
 //路径连接，串联
@@ -60,3 +109,4 @@ func BytesToInt(b []byte) int {
 
 	return int(x)
 }
+

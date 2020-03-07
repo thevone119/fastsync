@@ -1,9 +1,11 @@
 package comm
 
 import (
+	"fmt"
 	"github.com/fsnotify/fsnotify"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 	"zinx/zlog"
 )
@@ -13,7 +15,7 @@ import (
 //测试后，还是google的包好用点
 //需要做一些完整测试。比如移动目录，好像无法监听？
 //windows在监控的情况下，是无法直接删除父目录的。
-
+//监控日志统一存放在notifylog目录,名字命名命名为xxx.nlog
 type FSWatch struct {
 	watch      *fsnotify.Watcher
 	basepath   string
@@ -21,6 +23,8 @@ type FSWatch struct {
 	errorCount int       //错误次数
 	//当前日志绑定的输出文件
 	logfile *os.File
+	logfileOpen bool
+	logDay int	//日志的日期
 }
 
 func NewFSWatch(bpath string) *FSWatch {
@@ -28,6 +32,7 @@ func NewFSWatch(bpath string) *FSWatch {
 		watch:    nil,
 		basepath: bpath,
 		exitChan: make(chan bool, 2),
+		logDay:-1,
 	}
 }
 
@@ -35,6 +40,40 @@ func NewFSWatch(bpath string) *FSWatch {
 func (w *FSWatch) IsDir(dir string) bool {
 	return filepath.Ext(dir) == ""
 }
+//打开日志文件
+func (w *FSWatch) openLog(){
+	day:=time.Now().YearDay()
+	//日期变了。重新开一个新的文件
+	if day!=w.logDay{
+		if w.logfileOpen{
+			w.logfile.Close()
+			w.logfileOpen = false
+		}
+		//先创建目录
+		logpath:=filepath.Join(NOTIFY_PATH,"inotifylog_"+time.Now().Format("20060102")+"_"+strconv.FormatInt(int64(CURR_PID),10)+".nlog")
+		if checkFileExist(logpath) {
+			//文件存在，打开
+			f, err := os.OpenFile(logpath, os.O_APPEND|os.O_RDWR, 0644)
+			if err!=nil{
+				zlog.Error("open file err",logpath,err)
+			}else{
+				w.logfile=f
+				w.logfileOpen = true
+			}
+		} else {
+			//文件不存在，创建
+			f, err := os.OpenFile(logpath, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
+			if err!=nil{
+				zlog.Error("open file err",logpath,err)
+			}else{
+				w.logfile=f
+				w.logfileOpen = true
+			}
+		}
+		w.logDay=day
+	}
+}
+
 
 func (w *FSWatch) Start() {
 	wer, err := fsnotify.NewWatcher()
@@ -142,8 +181,11 @@ func (w *FSWatch) Close() {
 //记录日志哦，通过日志进行监控中转。
 //后续可使用外部其他的工具生成日志，从而生成监控
 //同时也避免了事件阻塞
-//日志格式标准为 2020-02-02 03:03:03|/home/ap/cc/xx.txt|d
+//日志格式标准为 2020-02-02 03:03:03 /home/ap/cc/xx.txt d
 //考虑兼容inotify-tools工具生成的日志格式
 func (w *FSWatch) Log(p string, op string) {
-
+	w.openLog()
+	if w.logfileOpen{
+		fmt.Fprintln(w.logfile,time.Now().Format("2006-01-02 15:04:05"),p,op)
+	}
 }

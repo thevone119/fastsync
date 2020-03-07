@@ -7,7 +7,7 @@ import (
 	"encoding/binary"
 	"io"
 	"os"
-	"strings"
+	"path/filepath"
 	"sync"
 	"time"
 	"utils"
@@ -235,7 +235,7 @@ func (this *SyncFile) Open() error {
 	}
 	this.FOpen = true
 	//创建多级目录
-	os.MkdirAll(this.FileAPath[:strings.LastIndex(this.FileAPath, "/")], os.ModePerm)
+	os.MkdirAll(filepath.Dir(this.FileAPath), 0755)
 	//针对已存在的文件，则是打开文件，设置大小为0，并指针指向开头
 	//不存在的文件，则创建文件
 	fw, err := os.Create(this.FileAPath)
