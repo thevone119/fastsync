@@ -4,5 +4,6 @@
   "BasePath":"e:/project2",
   "UserName": "easysite",
   "PassWord": "easysite123",
-  "AllowDel": true
+  "AllowDelFile": true,
+  "AllowDelDir": false
 }

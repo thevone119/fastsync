@@ -22,7 +22,7 @@ func main() {
 	// &user 就是接收命令行中输入 -u 后面的参数值，其他同理
 	flag.Int64Var(&ltime, "t", 0, "文件最后修改时间，默认0")
 	flag.StringVar(&lpath, "p", "/", "同步文件路径，默认根路径")
-	flag.IntVar(&filecheck, "c", 0, "同步文件校验类型，默认3(完整的MD5校验)")
+	flag.IntVar(&filecheck, "c", 3, "同步文件校验类型，默认3(完整的MD5校验)")
 	// 解析命令行参数写入注册的flag里
 	flag.Parse()
 	zlog.Info("开始执行全量文件同步，同步时间:", ltime, "秒，同步路径:", "文件校验类型:", filecheck)

@@ -101,7 +101,7 @@ func (this *CheckFileRouter) Handle(request ziface.IRequest) {
 	//如果文件不存在,则上传文件
 	if hasf, _ := comm.PathExists(FileAPath); hasf == false {
 		request.GetConnection().SendBuffMsg(comm.NewCheckFileRetMsg(ckcekf.Filepath, 1).GetMsg())
-		zlog.Info("file not found", ckcekf.Filepath)
+		zlog.Debug("file not found", ckcekf.Filepath)
 		return
 	} else {
 		//存在，则校验MD5
@@ -111,12 +111,12 @@ func (this *CheckFileRouter) Handle(request ziface.IRequest) {
 			return
 		}
 		if bytes.Equal(md5, ckcekf.Check) {
-			zlog.Info("check file same", ckcekf.Filepath)
+			zlog.Debug("check file same", ckcekf.Filepath)
 			request.GetConnection().SendBuffMsg(comm.NewCheckFileRetMsg(ckcekf.Filepath, 2).GetMsg())
 		} else {
 			//zlog.Debug("old md5:", fmt.Sprintf("%x",ckcekf.Check))
 			//zlog.Debug("new md5:", fmt.Sprintf("%x",md5))
-			zlog.Info("check file is different", ckcekf.Filepath)
+			zlog.Debug("check file is different", ckcekf.Filepath)
 			request.GetConnection().SendBuffMsg(comm.NewCheckFileRetMsg(ckcekf.Filepath, 1).GetMsg())
 		}
 	}
@@ -173,17 +173,17 @@ func (this *SendFileReqRouter) Handle(request ziface.IRequest) {
 		request.GetConnection().SendBuffMsg(comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 1).GetMsg())
 		return
 	case 2:
-		zlog.Info("file not found", freq.Filepath)
+		zlog.Debug("file not found", freq.Filepath)
 		syncf.Open()
 		request.GetConnection().SendBuffMsg(comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 0).GetMsg())
 		return
 	case 3:
-		zlog.Info("check file is different", freq.Filepath)
+		zlog.Debug("check file is different", freq.Filepath)
 		syncf.Open()
 		request.GetConnection().SendBuffMsg(comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 0).GetMsg())
 		return
 	case 4:
-		zlog.Info("file not check,upload", freq.Filepath)
+		zlog.Debug("file not check,upload", freq.Filepath)
 		syncf.Open()
 		request.GetConnection().SendBuffMsg(comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 0).GetMsg())
 		return
@@ -317,10 +317,7 @@ type DeleteFileRouter struct {
 
 //
 func (this *DeleteFileRouter) Handle(request ziface.IRequest) {
-	if !ServerConfigObj.AllowDel {
-		zlog.Debug("AllowDel", ServerConfigObj.AllowDel)
-		return
-	}
+
 	zlog.Debug("DeleteFileMsg...")
 	sf := comm.NewDeleteFileReqMsgByByte(request.GetData())
 
@@ -333,6 +330,29 @@ func (this *DeleteFileRouter) Handle(request ziface.IRequest) {
 	//文件的绝对路径
 	FileAPath := comm.AppendPath(ServerConfigObj.BasePath, sf.Filepath)
 
+	if !ServerConfigObj.AllowDelFile {
+		zlog.Debug("AllowDelFile", ServerConfigObj.AllowDelFile)
+		request.GetConnection().SendBuffMsg(comm.NewCommRetMsg(sf.SecId, 1, "不允许进行文件删除操作", 0, "").GetMsg())
+		return
+	}
+	//判断是文件还是文件夹
+	f, err := os.Stat(FileAPath)
+	if err!=nil{
+		if os.IsNotExist(err) {
+			zlog.Error("file not found")
+			request.GetConnection().SendBuffMsg(comm.NewCommRetMsg(sf.SecId, 1, "文件不存在", 0, "").GetMsg())
+			return
+		}
+		zlog.Error("file info err")
+		request.GetConnection().SendBuffMsg(comm.NewCommRetMsg(sf.SecId, 1, "获取文件信息异常", 0, "").GetMsg())
+		return
+	}
+	if(f.IsDir() && !ServerConfigObj.AllowDelDir){
+		zlog.Debug("AllowDelDir",ServerConfigObj.AllowDelDir)
+		request.GetConnection().SendBuffMsg(comm.NewCommRetMsg(sf.SecId, 1, "不允许进行目录删除操作", 0, "").GetMsg())
+		return
+	}
+
 	//每个文件锁2秒
 	if comm.TempMap.Has(FileAPath) {
 		zlog.Debug("DeleteFile is lock by other", FileAPath)
@@ -343,8 +363,10 @@ func (this *DeleteFileRouter) Handle(request ziface.IRequest) {
 		defer comm.TempMap.Remove(FileAPath)
 	}
 
+
+
 	//删除文件
-	err := os.Remove(FileAPath)
+	err = os.Remove(FileAPath)
 
 	if err != nil {
 		// 删除失败
@@ -393,6 +415,9 @@ func (this *MoveFileRouter) Handle(request ziface.IRequest) {
 	}
 	//是否删除源
 	rmsrc := sf.OpType == 1
+	if 	!ServerConfigObj.AllowDelDir || !ServerConfigObj.AllowDelFile{
+		rmsrc=false
+	}
 	//如果是文件夹，递归调用
 	if files.IsDir() {
 		err = this.copyDir(srcFileAPath, dstFileAPath, rmsrc)

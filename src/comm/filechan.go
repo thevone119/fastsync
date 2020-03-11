@@ -2,7 +2,6 @@ package comm
 
 import (
 	"bufio"
-	"container/list"
 	"errors"
 	"io"
 	"os"
@@ -20,7 +19,6 @@ import (
 type FileChan struct {
 	dir      string      //监控某个目录
 	pattern  string      //文件名匹配规则*.fchan
-	LineChan chan string //所有的文件，读取到一行，就放入到这个管道中
 	isExit   bool
 }
 
@@ -28,7 +26,6 @@ func NewFileChan(d string, p string) *FileChan {
 	f := &FileChan{
 		dir:      d,
 		pattern:  p,
-		LineChan: make(chan string, 100),
 		isExit:   false,
 	}
 	return f
@@ -54,7 +51,7 @@ func (f *FileChan) goHandle2(){
 		//恢复程序的控制权
 		if p := recover(); p != nil {
 			zlog.Error("文件监控轮训发生错误，3秒后重启轮训", p,f.dir)
-			time.Sleep(time.Second*1)
+			time.Sleep(time.Second*3)
 		}
 	}()
 	//通过Walk来遍历目录下f的所有子目录
@@ -75,22 +72,14 @@ func (f *FileChan) goHandle2(){
 			return nil
 		}
 		fl.FlastRedTime = time.Now().UnixNano()
-		fl.open()
-		l, err := fl.ReadLines()
-		if err != nil {
-			return nil
-			//出错了,
-		} else {
-			for i := l.Front(); i != nil; i = i.Next() {
-				f.LineChan <- i.Value.(string)
-			}
-		}
-
-		return nil
+		err = fl.ReadLines()
+		return err
 	})
 	//1秒轮询
 	time.Sleep(time.Second)
 }
+
+
 
 //关闭所有文件，管道
 func (f *FileChan) Close() {
@@ -154,11 +143,20 @@ func (f *FileLine) close() {
 	}
 }
 
+//处理某行记录，空格隔开
+func (f *FileLine) doLine(l string) {
+	s:=strings.Split(l, " ")
+	for _, v := range s {
+		if strings.Index(v,BASE_MON_PATH)>=0{
+			FileChangeMonitorObj.AddPath(v)
+		}
+	}
+}
+
 //一次读取多行
-func (f *FileLine) ReadLines() (*list.List, error) {
-	retl := list.New()
+func (f *FileLine) ReadLines() ( error) {
 	if !f.FOpen {
-		return retl, errors.New("file on open")
+		return  errors.New("file on open")
 	}
 	f.open()
 	defer f.close()
@@ -173,7 +171,7 @@ func (f *FileLine) ReadLines() (*list.List, error) {
 	sk, err := f.FH.Seek(f.filestart, io.SeekStart)
 	//超标
 	if err != nil {
-		return retl, err
+		return  err
 	}
 	bf:=bufio.NewReader(f.FH)
 
@@ -182,11 +180,14 @@ func (f *FileLine) ReadLines() (*list.List, error) {
 		if err != nil {
 			break
 		}
-		retl.PushBack(strings.TrimRight(l, "\n"))
+		l=strings.TrimRight(l, "\n")
+		if strings.Index(l,BASE_MON_PATH)>=0{
+			f.doLine(l)
+		}
 	}
 	sk, _ = f.FH.Seek(0, io.SeekCurrent)
 	f.filestart = sk
 	LeveldbDB.PutInt64([]byte("FL_"+f.fp),f.filestart)
-	return retl, nil
+	return  nil
 }
 

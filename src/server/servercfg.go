@@ -10,7 +10,8 @@ import (
 //服务端配置
 type serverConfig struct {
 	BasePath     string //文件服务的基础路径
-	AllowDel     bool   //是否允许删除
+	AllowDelFile     bool   //是否允许删除
+	AllowDelDir     bool   //是否允许删除
 	ConfFilePath string
 	UserName     string //服务器的登录用户名
 	PassWord     string //服务器的密码
@@ -31,7 +32,8 @@ func init() {
 		ConfFilePath: "conf/server.json",
 		UserName:     "admin",
 		PassWord:     "admin123",
-		AllowDel:     false,
+		AllowDelFile:     false,
+		AllowDelDir:     false,
 	}
 
 	//从配置文件中加载一些用户配置的参数

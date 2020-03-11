@@ -28,6 +28,8 @@ var CURR_RUN_NAME=""	//当前运行程序名称	xxx.exe
 
 var NOTIFY_PATH = "notifylog"	//日志监控目录，没有则自动创建
 
+var BASE_MON_PATH=""			//基础的监控路径/home/nas/static
+
 /*
 	提供init方法，默认加载
 */

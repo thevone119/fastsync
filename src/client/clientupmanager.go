@@ -55,7 +55,7 @@ func srtToFileUpload(str string) *FileUpload {
 	ip := strs[2][:strings.Index(strs[2], ":")]
 	port, _ := strconv.Atoi(strs[2][strings.Index(strs[2], ":")+1 : strings.Index(strs[2], "/")])
 	path := strs[2][strings.Index(strs[2], "/"):]
-	c := NewNetWork(ip, port, username, pwd)
+	c := NewNetWork(ip, port, username, pwd,strs[2])
 	fupload := NewFileUpload(c, 20, path)
 	return fupload
 }
@@ -114,11 +114,17 @@ func (c *ClientUpManager) SyncFile(lp string, cktype comm.CheckFileType) {
 //删除服务器中的某个文件,包括文件夹
 func (c *ClientUpManager) DeleteFile(lp string) {
 	//不允许删除操作
-	if !ClientConfigObj.AllowDel {
-		zlog.Debug("AllowDel", ClientConfigObj.AllowDel, lp)
+	if !ClientConfigObj.AllowDelFile {
+		zlog.Debug("AllowDelFile", ClientConfigObj.AllowDelFile, lp)
+		return
+	}
+	//如果是目录，则判断目录是否可以删除
+	if filepath.Ext(lp) == "" && !ClientConfigObj.AllowDelDir{
+		zlog.Debug("AllowDelDir", ClientConfigObj.AllowDelDir, lp)
 		return
 	}
 	zlog.Debug("DeleteFile..", lp)
+
 	rp, err := ClientConfigObj.GetRelativePath(lp)
 	if err != nil {
 		zlog.Error("DeleteFile..err,path:", lp)

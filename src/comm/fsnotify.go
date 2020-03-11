@@ -1,7 +1,6 @@
 package comm
 
 import (
-	"fmt"
 	"github.com/fsnotify/fsnotify"
 	"os"
 	"path/filepath"
@@ -184,8 +183,10 @@ func (w *FSWatch) Close() {
 //日志格式标准为 2020-02-02 03:03:03 /home/ap/cc/xx.txt d
 //考虑兼容inotify-tools工具生成的日志格式
 func (w *FSWatch) Log(p string, op string) {
-	w.openLog()
+	FileChangeMonitorObj.AddPath(p)
+	//不加日志了直接加到内存中
+	//w.openLog()
 	if w.logfileOpen{
-		fmt.Fprintln(w.logfile,time.Now().Format("2006-01-02 15:04:05"),p,op)
+		//fmt.Fprintln(w.logfile,time.Now().Format("2006-01-02 15:04:05"),p,op)
 	}
 }

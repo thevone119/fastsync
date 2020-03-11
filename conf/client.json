@@ -1,7 +1,13 @@
 {
   "LocalPath":"e:/project",
-  "LocalPathMonitor": true,
-  "AllowDel": true,
-  "RemotePath":["easysite|easysite123|127.0.0.1:8999/","easysite|easysite123|127.0.0.1:8999/","easysite|easysite123|127.0.0.1:8999/","easysite|easysite123|127.0.0.1:8999/","easysite|easysite123|127.0.0.1:8999/"]
-
+  "NotifyMonitor": ["e:/project"],
+  "PollMonitor": ["e:/project"],
+  "PollTime": 5000,
+  "LogMonitor": ["e:/project"],
+  "AllowDelDir": false,
+  "AllowDelFile": true,
+  "filterFiles":["*.swp"],
+  "RemotePath":["easysite|easysite123|127.0.0.1:8999/","easysite|easysite123|127.0.0.1:8999/","easysite|easysite123|127.0.0.1:8999/","easysite|easysite123|127.0.0.1:8999/","easysite|easysite123|127.0.0.1:8999/"],
+  "AllSyncDayOfMonth": [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31],
+  "AllSyncTimeOfDay": ["04:05","05:06"]
 }

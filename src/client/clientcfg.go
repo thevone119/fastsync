@@ -14,7 +14,9 @@ type clientConfig struct {
 	LocalPath        string //本机监控路径
 	LocalPathMonitor bool   //是否开启本机监控
 	//全量推送校验规则
-	AllowDel     bool //是否允许删除
+	AllowDelFile     bool   //是否允许删除文件
+	AllowDelDir     bool   //是否允许删除目录
+	filterFiles []string 	//过滤文件类型
 	ConfFilePath string
 	RemotePath   []string //推送端路径，多个推送端
 
@@ -37,6 +39,7 @@ func init() {
 
 	//从配置文件中加载一些用户配置的参数
 	ClientConfigObj.reload()
+	comm.BASE_MON_PATH = ClientConfigObj.LocalPath
 	fmt.Println("SyncConfig load LocalPath:", ClientConfigObj.LocalPath, "RemotePath len:", len(ClientConfigObj.RemotePath))
 }
 

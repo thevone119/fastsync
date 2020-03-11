@@ -60,6 +60,5 @@ func goTimingTask() {
 		time.Sleep(time.Second * 5)
 		//清理文件SyncFileHandle
 		server.SyncFileHandle.ClearTimeout()
-
 	}
 }

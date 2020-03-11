@@ -25,6 +25,7 @@ type localFileHandle struct {
 //单个最大缓存大小，1M，超过这个大小，就不缓存了，直接每次读取文件块
 var MAX_CACHE_SIZE = int64(1024 * 1024)
 
+//各个服务器上传完成，要进行相关的汇总
 type LocalFile struct {
 	Lid          uint32             //主键
 	LPath        string             //本机路径（绝对路径）
@@ -244,4 +245,10 @@ func (this *LocalFile) CheckAndClose() bool{
 		return true
 	}
 	return false
+}
+
+//每个上传完成均调用此方法
+//等待所有的都完成了，则关闭文件
+func (this *LocalFile) UploadEnd(cname string,retcode byte,err error){
+
 }

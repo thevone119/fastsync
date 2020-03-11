@@ -16,6 +16,8 @@ import (
 
 //网络数据发送，处理
 type NetWork struct {
+	//名称
+	Name string
 	//服务绑定的IP地址
 	IP string
 	//服务绑定的端口
@@ -50,8 +52,9 @@ type NetWork struct {
 }
 
 //一个新的网络
-func NewNetWork(ip string, port int, username string, password string) *NetWork {
+func NewNetWork(ip string, port int, username string, password string,name string) *NetWork {
 	n := NetWork{
+		Name :			name,
 		IP:              ip,
 		Port:            port,
 		UserName:        username,
