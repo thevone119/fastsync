@@ -74,6 +74,7 @@ func (s *Server) Start() {
 		listenner, err := net.ListenTCP(s.IPVersion, addr)
 		if err != nil {
 			zlog.Error("listen", s.IPVersion, "err", err)
+			panic(err)
 			return
 		}
 

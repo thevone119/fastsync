@@ -3,7 +3,7 @@
   "TcpPort":8999,
   "BasePath":"e:/project2",
   "UserName": "easysite",
-  "PassWord": "easysite123",
+  "PassWord": "easysite12#$",
   "AllowDelFile": true,
   "AllowDelDir": false
 }

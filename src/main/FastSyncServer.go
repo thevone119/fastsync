@@ -2,22 +2,30 @@ package main
 
 import (
 	"comm"
-	"fmt"
 	"server"
 	"time"
 	"zinx/ziface"
+	"zinx/zlog"
 	"zinx/znet"
 )
 
 //创建连接的时候执行
 func DoConnectionBegin(conn ziface.IConnection) {
-	fmt.Println("DoConnecionBegin is Called ... ")
+	zlog.Debug("DoConnecionBegin is Called ... ")
 }
 
 //连接断开的时候执行
 func DoConnectionLost(conn ziface.IConnection) {
-	fmt.Println("DoConnectionLost is Called ... ", conn.GetConnID())
+	zlog.Debug("DoConnectionLost is Called ... ", conn.GetConnID())
 	//在连接销毁之前，做连接捆绑内容的清理
+	//错误拦截必须配合defer使用  通过匿名函数使用
+	defer func() {
+		//恢复程序的控制权
+		err := recover()
+		if err != nil {
+			zlog.Error("连接断开的时候执行拦截方法，出现意外错误", err)
+		}
+	}()
 	server.SyncFileHandle.CloseAll(conn.GetConnID())
 }
 
@@ -58,7 +66,19 @@ func main() {
 func goTimingTask() {
 	for {
 		time.Sleep(time.Second * 5)
-		//清理文件SyncFileHandle
-		server.SyncFileHandle.ClearTimeout()
+		goTimingTask2()
 	}
+}
+
+func goTimingTask2(){
+	defer func() {
+		//恢复程序的控制权
+		err := recover()
+		if err != nil {
+			zlog.Error("5秒定时任务出现错误", err)
+		}
+	}()
+	zlog.Debug("执行5秒定时清理内存")
+	//清理文件SyncFileHandle
+	server.SyncFileHandle.ClearTimeout()
 }

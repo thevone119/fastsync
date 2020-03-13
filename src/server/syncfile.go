@@ -114,6 +114,7 @@ type SyncFile struct {
 }
 
 func NewSyncFile(cid uint32, reqid uint32, fp string, flen int64, flastmodtime int64, cktype comm.CheckFileType, ckmd5 []byte) *SyncFile {
+
 	f := SyncFile{
 		ClientId:     cid,
 		ReqId:        reqid,
@@ -123,12 +124,13 @@ func NewSyncFile(cid uint32, reqid uint32, fp string, flen int64, flastmodtime i
 		FlastModTime: flastmodtime,
 		CheckMd5:     ckmd5,
 		FileId:       utils.GetNextUint(),
-		FileAPath:    comm.AppendPath(ServerConfigObj.BasePath, fp),
+		FileAPath:    filepath.Join(ServerConfigObj.BasePath, fp),
 		FH:           nil,
 		FOpen:        false,
 		CheckRet:     0,
 		LastTime:     time.Now().Unix(),
 	}
+	f.FileAPath,_=filepath.Abs(f.FileAPath)
 	f.init()
 
 	return &f

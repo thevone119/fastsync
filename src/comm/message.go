@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"zinx/ziface"
 	"zinx/znet"
 )
@@ -287,6 +288,7 @@ type SendFileReqMsg struct {
 }
 
 func NewSendFileReqMsg(reqid uint32, fl int64, modtime int64, cbyte []byte, ctype CheckFileType, isupload byte, fp string) *SendFileReqMsg {
+	fp=strings.Replace(fp,"\\","/",-1)
 	return &SendFileReqMsg{
 		ReqId:        reqid,
 		Flen:         fl,
@@ -331,7 +333,7 @@ func (m *SendFileReqMsg) GetMsg() ziface.IMessage {
 type SendFileReqRetMsg struct {
 	ReqId   uint32 //请求的ID
 	RetId   uint32 //返回的ID
-	RetCode byte   //返回码，做相关逻辑的 0:可以上传，1：io失败，无法上传，2：文件一致，无需上传
+	RetCode byte   //返回码，做相关逻辑的 0:可以上传，1：io失败，无法上传，2：文件一致，无需上传 3:文件正被其他客户端上传锁定 4：未登录，无法上传
 }
 
 func NewSendFileReqRetMsg(reqid uint32, retid uint32, retcode byte) *SendFileReqRetMsg {

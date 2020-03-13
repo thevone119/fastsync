@@ -28,7 +28,7 @@ var CURR_RUN_NAME=""	//当前运行程序名称	xxx.exe
 
 var NOTIFY_PATH = "notifylog"	//日志监控目录，没有则自动创建
 
-var BASE_MON_PATH=""			//基础的监控路径/home/nas/static
+var BASE_PATH=""			//基础的监控路径/home/nas/static
 
 /*
 	提供init方法，默认加载
@@ -43,7 +43,7 @@ func init() {
 		CURR_RUN_NAME=filepath.Base(path)
 		//日志监控目录，没有则自动创建
 		NOTIFY_PATH=filepath.Join(CURR_RUN_PATH,"notifylog")
-		os.MkdirAll(NOTIFY_PATH,0775)
+		//os.MkdirAll(NOTIFY_PATH,0755)
 	}
 
 }
@@ -85,6 +85,7 @@ func Mkdir(dir string) (e error) {
 
 //路径连接，串联
 func AppendPath(p1 string, p2 string) string {
+
 	return path.Join(p1, p2)
 }
 

@@ -32,13 +32,13 @@ type ClientUpManager struct {
 //装载所有的配置，启动所有的客户端监听，保持长连接
 func NewClientUpManager() *ClientUpManager {
 	cm := &ClientUpManager{
-		RemoteUpLoad: make([]*FileUpload, len(ClientConfigObj.RemotePath)),
+		RemoteUpLoad: make([]*FileUpload, len(comm.ClientConfigObj.RemotePath)),
 		lfileList:list.New(),
 	}
 
 	//装置客户端上传类
-	for i := 0; i < len(ClientConfigObj.RemotePath); i++ {
-		cm.RemoteUpLoad[i] = srtToFileUpload(ClientConfigObj.RemotePath[i])
+	for i := 0; i < len(comm.ClientConfigObj.RemotePath); i++ {
+		cm.RemoteUpLoad[i] = srtToFileUpload(comm.ClientConfigObj.RemotePath[i])
 	}
 	//开携程，处理清理工作
 	go cm.goCloseLocalFile()
@@ -91,9 +91,10 @@ func (c *ClientUpManager) SyncFile(lp string, cktype comm.CheckFileType) {
 			zlog.Error("文件上传处理发生意外错误", p, lp)
 		}
 	}()
+	lp,_=filepath.Abs(lp)
 	zlog.Debug("SyncFile..", lp)
 	//1.读取判断本地文件是否存在，大小，MD5等
-	rlp, err := ClientConfigObj.GetRelativePath(lp)
+	rlp, err := comm.ClientConfigObj.GetRelativePath(lp)
 	if err != nil {
 		zlog.Error("SyncFile..err,path:", lp)
 		return
@@ -114,18 +115,18 @@ func (c *ClientUpManager) SyncFile(lp string, cktype comm.CheckFileType) {
 //删除服务器中的某个文件,包括文件夹
 func (c *ClientUpManager) DeleteFile(lp string) {
 	//不允许删除操作
-	if !ClientConfigObj.AllowDelFile {
-		zlog.Debug("AllowDelFile", ClientConfigObj.AllowDelFile, lp)
+	if !comm.ClientConfigObj.AllowDelFile {
+		zlog.Debug("AllowDelFile", comm.ClientConfigObj.AllowDelFile, lp)
 		return
 	}
 	//如果是目录，则判断目录是否可以删除
-	if filepath.Ext(lp) == "" && !ClientConfigObj.AllowDelDir{
-		zlog.Debug("AllowDelDir", ClientConfigObj.AllowDelDir, lp)
+	if filepath.Ext(lp) == "" && !comm.ClientConfigObj.AllowDelDir{
+		zlog.Debug("AllowDelDir", comm.ClientConfigObj.AllowDelDir, lp)
 		return
 	}
 	zlog.Debug("DeleteFile..", lp)
 
-	rp, err := ClientConfigObj.GetRelativePath(lp)
+	rp, err := comm.ClientConfigObj.GetRelativePath(lp)
 	if err != nil {
 		zlog.Error("DeleteFile..err,path:", lp)
 		return
@@ -138,12 +139,12 @@ func (c *ClientUpManager) DeleteFile(lp string) {
 //复制服务器的文件，包括文件夹
 func (c *ClientUpManager) CopyFile(srcp string, dstp string) {
 	zlog.Debug("CopyFile..", srcp, dstp)
-	rsrcp, err := ClientConfigObj.GetRelativePath(srcp)
+	rsrcp, err := comm.ClientConfigObj.GetRelativePath(srcp)
 	if err != nil {
 		zlog.Error("CopyFile..err,path:", srcp)
 		return
 	}
-	rdstp, err := ClientConfigObj.GetRelativePath(dstp)
+	rdstp, err := comm.ClientConfigObj.GetRelativePath(dstp)
 	if err != nil {
 		zlog.Error("CopyFile..err,path:", dstp)
 		return
@@ -156,12 +157,12 @@ func (c *ClientUpManager) CopyFile(srcp string, dstp string) {
 //移动服务器的文件，包括文件夹
 func (c *ClientUpManager) MoveFile(srcp string, dstp string) {
 	zlog.Debug("MoveFile..", srcp, dstp)
-	rsrcp, err := ClientConfigObj.GetRelativePath(srcp)
+	rsrcp, err := comm.ClientConfigObj.GetRelativePath(srcp)
 	if err != nil {
 		zlog.Error("CopyFile..err,path:", srcp)
 		return
 	}
-	rdstp, err := ClientConfigObj.GetRelativePath(dstp)
+	rdstp, err := comm.ClientConfigObj.GetRelativePath(dstp)
 	if err != nil {
 		zlog.Error("CopyFile..err,path:", dstp)
 		return

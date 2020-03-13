@@ -4,14 +4,16 @@ import (
 	"client"
 	"comm"
 	"flag"
+	"os"
+	"path/filepath"
 	"time"
 	"zinx/zlog"
 )
 
 //同步目录
 //接受外部参数 -t 0 -p /test -c 3
-//-t 时间（分钟）
-//-p 路径
+//-t 时间（秒）
+//-p 路径 /
 //-c 校验类型
 //执行完后直接退出
 func main() {
@@ -28,7 +30,16 @@ func main() {
 	zlog.Info("开始执行全量文件同步，同步时间:", ltime, "秒，同步路径:", "文件校验类型:", filecheck)
 
 	t1 := time.Now()
-
+	lpath=filepath.Join(comm.BASE_PATH,lpath)
+	fp,err:=os.Stat(lpath)
+	if err!=nil{
+		zlog.Error("同步出错，找不到此路径",lpath,err)
+		return
+	}
+	if !fp.IsDir(){
+		zlog.Error("同步出错，此路径非目录",lpath)
+		return
+	}
 	c := client.NewClientUpManager()
 	c.SyncPath(ltime, lpath, comm.CheckFileType(filecheck))
 	//阻塞等待所有上传文件结束

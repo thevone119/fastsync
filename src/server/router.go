@@ -134,14 +134,14 @@ func (this *SendFileReqRouter) Handle(request ziface.IRequest) {
 
 	if !request.GetConnection().GetIsLogin() {
 		zlog.Error("SendFileReq err no login...")
-		request.GetConnection().SendBuffMsg(comm.NewSendFileReqRetMsg(freq.ReqId, 0, 1).GetMsg())
+		request.GetConnection().SendBuffMsg(comm.NewSendFileReqRetMsg(freq.ReqId, 0, 4).GetMsg())
 		return
 	}
 
 	//每个文件锁2秒
 	if comm.TempMap.Has(freq.Filepath) {
 		zlog.Debug("SendFileReq is lock by other", freq.Filepath)
-		request.GetConnection().SendBuffMsg(comm.NewSendFileReqRetMsg(freq.ReqId, 0, 1).GetMsg())
+		request.GetConnection().SendBuffMsg(comm.NewSendFileReqRetMsg(freq.ReqId, 0, 3).GetMsg())
 		return
 	} else {
 		comm.TempMap.Put(freq.Filepath, "", 2)
@@ -151,13 +151,13 @@ func (this *SendFileReqRouter) Handle(request ziface.IRequest) {
 	//不是同一个客户端ID，则锁住
 	if syncf.ClientId != request.GetConnection().GetConnID() {
 		zlog.Debug("SendFileReq is lock by other client", freq.Filepath)
-		request.GetConnection().SendBuffMsg(comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 1).GetMsg())
+		request.GetConnection().SendBuffMsg(comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 3).GetMsg())
 		return
 	}
 	//不是同一个请求，则锁住
 	if syncf.ReqId != freq.ReqId {
 		zlog.Debug("SendFileReq is lock by other thread", freq.Filepath)
-		request.GetConnection().SendBuffMsg(comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 1).GetMsg())
+		request.GetConnection().SendBuffMsg(comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 3).GetMsg())
 		return
 	}
 	//文件校验结果  0：有相同文件，无需上传 1：文件读取错误，无需上传 2：无文件，需要上传 3：文件校验不同，需要上传 4：无校验，直接上传
@@ -271,7 +271,7 @@ type SendFileMsgRouter struct {
 
 //
 func (this *SendFileMsgRouter) Handle(request ziface.IRequest) {
-	zlog.Debug("SendFileMsg...")
+	//zlog.Debug("SendFileMsg...")
 	sf := comm.NewSendFileMsgByByte(request.GetData())
 	//判断是否登录了
 	if !request.GetConnection().GetIsLogin() {
@@ -292,7 +292,7 @@ func (this *SendFileMsgRouter) Handle(request ziface.IRequest) {
 	wret := syncf.Write(sf)
 	switch wret {
 	case 1:
-		zlog.Debug("write succ...")
+		//zlog.Debug("write succ...")
 		request.GetConnection().SendBuffMsg(comm.NewSendFileRetMsg(sf.SecId, sf.FileId, sf.Start, 1).GetMsg())
 		return
 	case 2:

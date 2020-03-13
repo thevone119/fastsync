@@ -39,8 +39,8 @@ func NewFileUpload(nc *NetWork, to int64, fp string) *FileUpload {
 		timeout:            to,
 		RPath:              fp,
 		upLoads:            make(chan *LocalFile, 10),
-		sendFileReqRetChan: make(chan *comm.SendFileReqRetMsg, 5),
-		sendFileRetChan:    make(chan *comm.SendFileRetMsg, 5),
+		sendFileReqRetChan: make(chan *comm.SendFileReqRetMsg, 10),
+		sendFileRetChan:    make(chan *comm.SendFileRetMsg, 10),
 		secId:              0,
 	}
 	//注册一些方法哦
@@ -83,7 +83,7 @@ func (n *FileUpload) sendEndCallBack() {
 
 //异常包裹，出现任何的异常，均返回未知异常
 // 0:上传成功 1：io失败，无法上传，2：文件一致，无需上传 3：服务器读写错误 4：服务器连接异常，5：服务器连接异常，发送数据失败，6：校验文件上传超时，7：文件上传失败，读取文件异常
-//8：文件上中断，9：文件发送超时，10：文件块发送超时，11：服务端文件块写入失败 100：未知异常
+//8：文件上中断，9：文件发送超时，10：文件块发送超时，11：服务端文件块写入失败 12:服务器登录认证失败，无法上传 13：文件被其他客户端锁定，无法上传 100：未知异常
 func (n *FileUpload) doUploadChan(l *LocalFile) (retb byte, err error) {
 	//错误拦截,针对上传过程中遇到的错误进行拦截，避免出现意外错误，程序退出
 	defer func() {
@@ -98,7 +98,7 @@ func (n *FileUpload) doUploadChan(l *LocalFile) (retb byte, err error) {
 				err = errors.New("panic")
 			}
 			retb = 100
-			zlog.Error("文件上传发送意外错误", err)
+			zlog.Error("文件上传发送意外错误", p)
 		}
 	}()
 	return n.doUploadChan2(l)
@@ -115,6 +115,10 @@ func (n *FileUpload) doUploadChan2(l *LocalFile) (byte, error) {
 	//这里要做个判断，判断客户端是否活动，如果不在活动中，这个直接就失败了。避免某个客户端连接不上，柱塞所有的任务
 	if !n.netclient.IsActivity() {
 		return 4, errors.New("服务器连接异常")
+	}
+	//判断是否登录了服务器，未登录无法上传
+	if !n.netclient.Login{
+		//return 12, errors.New("服务器登录认证失败，无法上传")
 	}
 
 	//1.同步请求，请求服务器，看是否需要上传，如果需要则上传
@@ -143,6 +147,12 @@ func (n *FileUpload) doUploadChan2(l *LocalFile) (byte, error) {
 				}
 				if data.RetCode == 2 {
 					return 1, errors.New("文件一致，无需上传")
+				}
+				if data.RetCode == 3 {
+					return 13, errors.New("文件被其他客户端锁定，无法上传")
+				}
+				if data.RetCode == 4 {
+					return 12, errors.New("登录认证失败，无法上传")
 				}
 				return 100, errors.New("发送请求，未知返回码")
 			}
@@ -182,14 +192,18 @@ func (n *FileUpload) doUploadChan3(fh uint32, l *LocalFile) (byte, error) {
 	}
 	n.sendFileState = 2
 	//
-	timeout := 5 + l.Flen/(1024*1024*50)
-	//这里柱塞等待文件发送完成，然后返回，做超时处理。因为是文件块，因此5秒超时，这里要测试，发送完后，最后一块多久才返回，如果有发送缓存的话，怎么办呀
-	//2.柱塞等待返回，5秒超时
+	timeout := 6
+	//这里柱塞等待文件发送完成，然后返回，每块4k,最多6秒超时
+	//2.柱塞等待返回，6秒超时
 	for {
 		select {
 		case data, ok := <-n.sendFileRetChan:
 			if ok {
 				if data.FileId != fh {
+					break
+				}
+				//块成功，不处理
+				if data.RetCode == 1 {
 					break
 				}
 				//传输完成,文件上传成功了
@@ -199,6 +213,7 @@ func (n *FileUpload) doUploadChan3(fh uint32, l *LocalFile) (byte, error) {
 				if data.RetCode == 2 {
 					return 11, errors.New("服务端文件块写入失败")
 				}
+
 				return 100, errors.New("未知错误，不可到的达传送文件块返回")
 			}
 		case <-time.After(time.Duration(timeout) * time.Second):
@@ -217,20 +232,12 @@ func (n *FileUpload) doSendFileRet(msg ziface.IMessage) {
 		if n.sendFileState == 1 {
 			n.sendFileState = 3
 		}
-		//每次发送前先清下管道,有效避免管道柱塞
-		if len(n.sendFileRetChan) > 0 {
-			<-n.sendFileRetChan
-		}
-		n.sendFileRetChan <- sret
 	}
-	//发送完成了
-	if sret.RetCode == 3 {
-		//每次发送前先清下管道,有效避免管道柱塞
-		if len(n.sendFileRetChan) > 0 {
-			<-n.sendFileRetChan
-		}
-		n.sendFileRetChan <- sret
+	//每次发送前先清下管道,有效避免管道柱塞
+	if len(n.sendFileRetChan) > 5 {
+		<-n.sendFileRetChan
 	}
+	n.sendFileRetChan <- sret
 }
 
 //发送文件上传请求的返回

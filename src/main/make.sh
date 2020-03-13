@@ -6,8 +6,11 @@ go build testfsnotify.go
 go build Server.go
 
 
-nohup ./FastSyncServer > FastSyncServer.log 2>&1 &
-nohup ./testfsnotify > testfsnotify.log 2>&1 &
+#ps -ef | grep /FastSyncServer | awk '{print $2}' | xargs kill -9
+#kill -9 `pidof FastSyncServer`
+cd /home/ap/webapp/
+nohup ./FastSyncServer >/dev/null 2>&1&
+nohup /home/ap/ccb/FastSyncClient/FastSyncDir -p / -t 0 -c 4 >/dev/null 2>&1&
 
 
 

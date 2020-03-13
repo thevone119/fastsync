@@ -90,6 +90,7 @@ func (this *LocalFile) init() {
 	var result []byte
 	if this.Flen < MAX_CACHE_SIZE {
 		//所有数据读入缓存
+
 		this.CacheFile = make([]byte, this.Flen)
 		_, err := this.FH.Read(this.CacheFile)
 		if err != nil {
@@ -97,6 +98,7 @@ func (this *LocalFile) init() {
 			this.Close()
 			return
 		}
+		this.FH.Close()
 		//缓存中对数据进行MD5
 		switch this.cktype {
 		case comm.FCHECK_NOT_CHECK:
@@ -136,7 +138,6 @@ func (this *LocalFile) init() {
 			this.FileMd5 = hash.Sum(result)
 			break
 		}
-		this.Close()
 	} else {
 		//缓存中对数据进行MD5
 		switch this.cktype {
@@ -189,6 +190,7 @@ func (this *LocalFile) Read(start int64, b []byte) (n int, err error) {
 			readnum = this.Flen - start
 		}
 		end := readnum + start
+
 		for i := start; i < end; i++ {
 			b[i-start] = this.CacheFile[i]
 		}
@@ -222,10 +224,10 @@ func (this *LocalFile) OneUploadEnd(){
 //关闭文件句柄
 func (this *LocalFile) Close() {
 	this.FOpen = false
+	this.CacheFile = nil
 	if this.FH != nil {
 		this.FH.Close()
 		this.FH = nil
-		this.CacheFile = nil
 	}
 }
 

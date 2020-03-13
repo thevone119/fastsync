@@ -3,8 +3,9 @@ package server
 import (
 	"comm"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
+	"path/filepath"
+	"zinx/zlog"
 )
 
 //服务端配置
@@ -38,7 +39,8 @@ func init() {
 
 	//从配置文件中加载一些用户配置的参数
 	ServerConfigObj.Reload()
-	fmt.Println("serverConfig load BasePath:", ServerConfigObj.BasePath)
+	ServerConfigObj.BasePath,_=filepath.Abs(ServerConfigObj.BasePath)
+	zlog.Debug("serverConfig load BasePath:", ServerConfigObj.BasePath)
 }
 
 //读取用户的配置文件

@@ -42,6 +42,7 @@ func (f *FileChan) goHandle() {
 			return
 		}
 		f.goHandle2()
+
 	}
 }
 
@@ -54,29 +55,44 @@ func (f *FileChan) goHandle2(){
 			time.Sleep(time.Second*3)
 		}
 	}()
-	//通过Walk来遍历目录下f的所有子目录
-	filepath.Walk(f.dir, func(p string, info os.FileInfo, err error) error {
-		if info.IsDir() {
-			return nil
-		}
-		if f.isExit {
-			return nil
-		}
-		m, _ := filepath.Match(f.pattern, info.Name())
-		if !m {
-			return nil
-		}
-		//获取文件
-		fl := NewFileLine(p)
-		if fl.FlastRedTime > info.ModTime().UnixNano() {
-			return nil
-		}
-		fl.FlastRedTime = time.Now().UnixNano()
-		err = fl.ReadLines()
-		return err
-	})
 	//1秒轮询
 	time.Sleep(time.Second)
+	//判断是文件还是目录
+	fi,err:=os.Stat(f.dir)
+	if err!=nil{
+		return
+	}
+	if fi.IsDir(){
+		//通过Walk来遍历目录下f的所有子目录
+		filepath.Walk(f.dir, func(p string, info os.FileInfo, err error) error {
+			if info.IsDir() {
+				return nil
+			}
+			if f.isExit {
+				return nil
+			}
+			m, _ := filepath.Match(f.pattern, info.Name())
+			if !m {
+				return nil
+			}
+			//获取文件
+			fl := NewFileLine(p)
+			if fl.FlastRedTime > info.ModTime().UnixNano() {
+				return nil
+			}
+			fl.FlastRedTime = time.Now().UnixNano()
+			err = fl.ReadLines()
+			return err
+		})
+	}else{
+		//获取文件
+		fl := NewFileLine(f.dir)
+		if fl.FlastRedTime > fi.ModTime().UnixNano() {
+			return
+		}
+		fl.FlastRedTime = time.Now().UnixNano()
+		fl.ReadLines()
+	}
 }
 
 
@@ -147,7 +163,7 @@ func (f *FileLine) close() {
 func (f *FileLine) doLine(l string) {
 	s:=strings.Split(l, " ")
 	for _, v := range s {
-		if strings.Index(v,BASE_MON_PATH)>=0{
+		if strings.Index(v,BASE_PATH)>=0{
 			FileChangeMonitorObj.AddPath(v)
 		}
 	}
@@ -181,7 +197,7 @@ func (f *FileLine) ReadLines() ( error) {
 			break
 		}
 		l=strings.TrimRight(l, "\n")
-		if strings.Index(l,BASE_MON_PATH)>=0{
+		if strings.Index(l,BASE_PATH)>=0{
 			f.doLine(l)
 		}
 	}

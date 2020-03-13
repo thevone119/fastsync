@@ -35,8 +35,6 @@ type GlobalObj struct {
 	*/
 	ConfFilePath string
 
-	AllowDelFile bool	//是否允许删除文件
-
 }
 
 /*
@@ -83,7 +81,7 @@ func (g *GlobalObj) Reload() {
 func init() {
 	//初始化GlobalObject变量，设置一些默认值
 	GlobalObject = &GlobalObj{
-		Name:             "easysite fastsync",
+		Name:             "AiSite FastSync",
 		Version:          "V1.11",
 		TcpPort:          8999,
 		Host:             "0.0.0.0",

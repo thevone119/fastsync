@@ -93,21 +93,23 @@ func (n *NetWork) connect() {
 	n.TimeConnected = time.Now().Unix()
 	n.TimeOutTime = n.TimeConnected
 	adder := fmt.Sprintf("%s:%d", n.IP, n.Port)
-	fmt.Println("connect to:", adder)
+	zlog.Debug("connect to:", adder)
+
 	conn, err := net.DialTimeout("tcp", adder, time.Duration(3)*time.Second)
 	if err != nil {
-		fmt.Println("NetWork Connect err!", adder)
+		zlog.Error("NetWork Connect err!", adder)
 		return
 	}
 	//这里才重新开启管道哦
 	n.sendMsgs = make(chan ziface.IMessage, 10)
 	n.receive = make(chan ziface.IMessage, 10)
-	fmt.Println("NetWork Connect succ!", n.IP)
+	zlog.Debug("NetWork Connect succ!", n.IP)
 	n.Conn = conn
 	n.Connected = true
 	n.ActivityTime = n.TimeConnected
 	//登录认证
-	n.Enqueue(comm.NewLoginMsg(n.UserName, n.PassWord).GetMsg())
+	n.SendData(comm.NewLoginMsg(n.UserName, n.PassWord).GetMsg())
+
 
 	//开启读写线程
 	go n.receiveData()
@@ -211,13 +213,13 @@ func (n *NetWork) receiveData() {
 		headData := make([]byte, dp.GetHeadLen())
 		_, err := io.ReadFull(n.Conn, headData) //ReadFull 会把msg填充满为止
 		if err != nil {
-			fmt.Println("read head error")
+			zlog.Error("read head error")
 			break
 		}
 		//将headData字节流 拆包到msg中
 		msgHead, err := dp.Unpack(headData)
 		if err != nil {
-			fmt.Println("server unpack err:", err)
+			zlog.Error("server unpack err:", err)
 			return
 		}
 
@@ -229,7 +231,7 @@ func (n *NetWork) receiveData() {
 			//根据dataLen从io中读取字节流
 			_, err := io.ReadFull(n.Conn, msg.Data)
 			if err != nil {
-				fmt.Println("server unpack data err:", err)
+				zlog.Error("server unpack data err:", err)
 				return
 			}
 			//不放管道了，接受到所有数据都直接处理,单独开启线程处理

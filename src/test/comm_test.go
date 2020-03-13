@@ -2,6 +2,7 @@ package test
 
 import (
 	"fmt"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -12,6 +13,8 @@ func TestDate(t *testing.T) {
 	//Mouth  = now.Month()
 	//Day  =  now.Day()
 	//时间格式化输出 Printf输出
+	filepath.
+	fmt.Println(filepath.Abs("e:/project222/\\affw"))
 	fmt.Printf("当前时间为： %d-%d-%d %d:%d:%d\n",now.Year(),now.Month(),now.Day(),now.Hour(),now.Minute(),now.Second())
 	//fmt.Sprintf 格式化输出
 	dateString := fmt.Sprintf("当前时间为： %d-%d-%d %d:%d:%d\n",now.Year(),now.Month(),now.Day(),now.Hour(),now.Minute(),now.Second())
