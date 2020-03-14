@@ -4,7 +4,6 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"os"
 	"path/filepath"
-	"strconv"
 	"time"
 	"zinx/zlog"
 )
@@ -48,8 +47,9 @@ func (w *FSWatch) openLog(){
 			w.logfile.Close()
 			w.logfileOpen = false
 		}
+		os.MkdirAll(NOTIFY_PATH,0755)
 		//先创建目录
-		logpath:=filepath.Join(NOTIFY_PATH,"inotifylog_"+time.Now().Format("20060102")+"_"+strconv.FormatInt(int64(CURR_PID),10)+".nlog")
+		logpath:=filepath.Join(NOTIFY_PATH,"nlog_"+time.Now().Format("20060102_150405")+".fstlog")
 		if checkFileExist(logpath) {
 			//文件存在，打开
 			f, err := os.OpenFile(logpath, os.O_APPEND|os.O_RDWR, 0644)

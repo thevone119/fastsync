@@ -138,13 +138,14 @@ func (this *SendFileReqRouter) Handle(request ziface.IRequest) {
 		return
 	}
 
-	//每个文件锁2秒
+	//每个文件锁2秒,
 	if comm.TempMap.Has(freq.Filepath) {
 		zlog.Debug("SendFileReq is lock by other", freq.Filepath)
 		request.GetConnection().SendBuffMsg(comm.NewSendFileReqRetMsg(freq.ReqId, 0, 3).GetMsg())
 		return
 	} else {
-		comm.TempMap.Put(freq.Filepath, "", 2)
+		//算了，不锁了，减少些内存消耗吧，后续看情况要不要锁
+		//comm.TempMap.Put(freq.Filepath, "", 2)
 	}
 
 	syncf := SyncFileHandle.GetSyncFile(request.GetConnection().GetConnID(), freq.ReqId, freq.Filepath, freq.Flen, freq.FlastModTime, freq.CheckType, freq.Check)
@@ -290,6 +291,8 @@ func (this *SendFileMsgRouter) Handle(request ziface.IRequest) {
 	//zlog.Debug("SendFileMsg...", sf.Start)
 	//0:未成功，1：成功  2:服务器读写错误 3：传输完成（最后的块都传输完了）
 	wret := syncf.Write(sf)
+	//释放byte 4K
+	sf.Fbyte=nil
 	switch wret {
 	case 1:
 		//zlog.Debug("write succ...")

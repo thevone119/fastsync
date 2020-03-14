@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"zinx/zlog"
@@ -28,6 +29,9 @@ var CURR_RUN_NAME=""	//当前运行程序名称	xxx.exe
 
 var NOTIFY_PATH = "notifylog"	//日志监控目录，没有则自动创建
 
+var TRANSFER_PATH = "transferlog"	//传输日志，没有则自动创建
+
+var WAIT_UP_PATH = "waituplog"			//等待上传的记录在这里，临时记录，上传完清空
 var BASE_PATH=""			//基础的监控路径/home/nas/static
 
 /*
@@ -35,14 +39,19 @@ var BASE_PATH=""			//基础的监控路径/home/nas/static
 */
 func init() {
 	//初始化全局变量，设置一些默认值
-	path, err := os.Executable()
+	file, err := exec.LookPath(os.Args[0])
+	path, err := filepath.Abs(file)
 	if err != nil {
 		zlog.Error("获取程序运行目录出错",err)
 	}else{
 		CURR_RUN_PATH = filepath.Dir(path)
-		CURR_RUN_NAME=filepath.Base(path)
+		CURR_RUN_NAME = filepath.Base(path)
+
 		//日志监控目录，没有则自动创建
-		NOTIFY_PATH=filepath.Join(CURR_RUN_PATH,"notifylog")
+		NOTIFY_PATH = filepath.Join(CURR_RUN_PATH,"notifylog")
+		TRANSFER_PATH = filepath.Join(CURR_RUN_PATH,"transferlog")
+		WAIT_UP_PATH= filepath.Join(CURR_RUN_PATH,"waituplog")
+
 		//os.MkdirAll(NOTIFY_PATH,0755)
 	}
 

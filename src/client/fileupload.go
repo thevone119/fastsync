@@ -64,22 +64,19 @@ func (n *FileUpload) goupLoadProcess() {
 		case data, ok := <-n.upLoads:
 			if ok {
 				//这个无论如何必须有返回
-				ret, err := n.doUploadChan(data)
-				//这里对发送完成做处理
-				if ret == 0 {
-
-				} else {
-					zlog.Error(err)
-				}
+				data.SUpLoadTime[n.netclient.Id]=time.Now().UnixNano() / 1e6
+				//调用上传处理
+				ret, _ := n.doUploadChan(data)
+				//返回码记录在这里汇总
+				data.EUpLoadTime[n.netclient.Id]=time.Now().UnixNano() / 1e6
+				data.RetCodes[n.netclient.Id]=ret
+				//结束
+				LocalFileHandle.UpLoadEndOne(data)
 			}
 		}
 	}
 }
 
-//发送完成回调
-func (n *FileUpload) sendEndCallBack() {
-
-}
 
 //异常包裹，出现任何的异常，均返回未知异常
 // 0:上传成功 1：io失败，无法上传，2：文件一致，无需上传 3：服务器读写错误 4：服务器连接异常，5：服务器连接异常，发送数据失败，6：校验文件上传超时，7：文件上传失败，读取文件异常
@@ -88,7 +85,6 @@ func (n *FileUpload) doUploadChan(l *LocalFile) (retb byte, err error) {
 	//错误拦截,针对上传过程中遇到的错误进行拦截，避免出现意外错误，程序退出
 	defer func() {
 		SyncFileWG.Done()
-		l.OneUploadEnd()
 		//恢复程序的控制权
 		if p := recover(); p != nil {
 			str, ok := p.(string)
@@ -245,7 +241,7 @@ func (n *FileUpload) doSendFileReqRet(msg ziface.IMessage) {
 	//sret :=comm.NewSendFileRetMsgByByte(msg.GetData())
 	reqret := comm.NewSendFileReqRetMsgByByte(msg.GetData())
 	//每次发送前先清下管道,有效避免管道柱塞
-	if len(n.sendFileReqRetChan) > 0 {
+	if len(n.sendFileReqRetChan) > 2 {
 		<-n.sendFileReqRetChan
 	}
 	n.sendFileReqRetChan <- reqret
@@ -266,12 +262,3 @@ func (n *FileUpload) MoveFile(srcrp string, dstrp string) {
 	n.netclient.Enqueue(comm.NewMoveFileReqMsg(0, 1, comm.AppendPath(n.RPath, srcrp), comm.AppendPath(n.RPath, dstrp)).GetMsg())
 }
 
-//记录上传成功记录
-func (n *FileUpload) logUploadSuss(lp string, msg string) {
-
-}
-
-//记录上传失败记录
-func (n *FileUpload) logUploadError(lp string, msg string) {
-	zlog.Error(lp, msg)
-}

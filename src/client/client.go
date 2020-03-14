@@ -2,6 +2,7 @@ package client
 
 import (
 	"comm"
+	"fmt"
 	"strings"
 	"time"
 	"zinx/zlog"
@@ -25,6 +26,8 @@ func NewClient() *Client{
 
 //开始
 func (c *Client) Start() {
+	zlog.Info("当前程序运行目录为:",comm.CURR_RUN_PATH,",程序日志将记录在此目录下")
+	fmt.Println("当前程序运行目录为:",comm.CURR_RUN_PATH,",程序日志将记录在此目录下")
 	//打开数据库
 	comm.LeveldbDB.Open()
 	//开启一个客户端监听处理

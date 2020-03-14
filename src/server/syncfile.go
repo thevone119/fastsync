@@ -56,7 +56,7 @@ func (s *syncFileHandle) RemoveSyncFile(sf *SyncFile) {
 	delete(s.fhmap, sf.FileId)
 }
 
-//当客户端关闭后，情况某个客户端的捆绑的所有数据
+//当客户端关闭后，清空某个客户端的捆绑的所有数据
 func (s *syncFileHandle) CloseAll(cid uint32) {
 	s.flock.Lock()
 	defer s.flock.Unlock()

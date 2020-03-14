@@ -2,7 +2,6 @@ package client
 
 import (
 	"comm"
-	"container/list"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -17,7 +16,7 @@ import (
 //2.删除本机文件
 //3.
 
-//定义全局的upload线程等待，只有等待到所有的线程结束，才推出
+//定义全局的upload线程等待，只有等待到所有的线程结束，才退出
 var SyncFileWG sync.WaitGroup
 
 //文件上传管理类，一次上传文件到多个服务器
@@ -25,37 +24,32 @@ type ClientUpManager struct {
 	RemoteUpLoad []*FileUpload //远端的服务器列表
 	//发送队列
 	SecId uint32 //序号ID
-	//所有的文件上传类记录在这里，用携程去监控上传类是否上传完成，完成了则需要关闭并且释放资源
-	lfileList *list.List
 }
 
 //装载所有的配置，启动所有的客户端监听，保持长连接
 func NewClientUpManager() *ClientUpManager {
 	cm := &ClientUpManager{
 		RemoteUpLoad: make([]*FileUpload, len(comm.ClientConfigObj.RemotePath)),
-		lfileList:list.New(),
 	}
 
 	//装置客户端上传类
 	for i := 0; i < len(comm.ClientConfigObj.RemotePath); i++ {
-		cm.RemoteUpLoad[i] = srtToFileUpload(comm.ClientConfigObj.RemotePath[i])
+		cm.RemoteUpLoad[i] = srtToFileUpload(i,comm.ClientConfigObj.RemotePath[i])
 	}
-	//开携程，处理清理工作
-	go cm.goCloseLocalFile()
 	return cm
 }
 
 
 //通过str构建一个fileUpload对象
 //username|pwd|127.0.0.1:9001/
-func srtToFileUpload(str string) *FileUpload {
+func srtToFileUpload(id int,str string) *FileUpload {
 	strs := strings.Split(str, "|")
 	username := strs[0]
 	pwd := strs[1]
 	ip := strs[2][:strings.Index(strs[2], ":")]
 	port, _ := strconv.Atoi(strs[2][strings.Index(strs[2], ":")+1 : strings.Index(strs[2], "/")])
 	path := strs[2][strings.Index(strs[2], "/"):]
-	c := NewNetWork(ip, port, username, pwd,strs[2])
+	c := NewNetWork(id,ip, port, username, pwd,strs[2])
 	fupload := NewFileUpload(c, 20, path)
 	return fupload
 }
@@ -76,6 +70,10 @@ func (c *ClientUpManager) SyncPath(ltime int64, lp string, filecheck comm.CheckF
 		if ltime > 0 && (currtime-info.ModTime().Unix()) > ltime {
 			return nil
 		}
+		//全量同步的时候，2秒内的文件不同步
+		if (currtime-info.ModTime().Unix())<2{
+			return nil
+		}
 		c.SyncFile(path, filecheck)
 		return nil
 	})
@@ -92,19 +90,26 @@ func (c *ClientUpManager) SyncFile(lp string, cktype comm.CheckFileType) {
 		}
 	}()
 	lp,_=filepath.Abs(lp)
-	zlog.Debug("SyncFile..", lp)
-	//1.读取判断本地文件是否存在，大小，MD5等
+	zlog.Debug("SyncFile", lp)
+
 	rlp, err := comm.ClientConfigObj.GetRelativePath(lp)
 	if err != nil {
 		zlog.Error("SyncFile..err,path:", lp)
 		return
 	}
-	ul := NewLocalFile(lp, rlp, cktype)
+	//1.读取判断本地文件是否存在，大小，MD5等
+	ul := NewLocalFile(len(comm.ClientConfigObj.RemotePath),lp, rlp, cktype)
+	if !ul.FOpen{
+		zlog.Error("打开文件失败:", lp)
+		ul.Close()
+		return
+	}else{
+		LocalFileHandle.AddLocalFile(ul)
+	}
 	//加入等待，全局等待
 	SyncFileWG.Add(len(c.RemoteUpLoad))
-	ul.AddWait(len(c.RemoteUpLoad))
 	//放入这个监控队列
-	c.lfileList.PushBack(ul)
+	//c.lfileList.PushBack(ul)
 	for _, fu := range c.RemoteUpLoad {
 		fu.SendUpload(ul)
 	}
@@ -179,19 +184,3 @@ func (c *ClientUpManager) Close() {
 	}
 }
 
-//采用携程关闭本地文件，释放资源
-func (c *ClientUpManager) goCloseLocalFile(){
-	//1秒轮训
-	for{
-		if c.lfileList.Len()>0{
-			var next *list.Element
-			for e := c.lfileList.Front(); e != nil; e = next {
-				next = e.Next()
-				if e.Value.(*LocalFile).CheckAndClose(){
-					c.lfileList.Remove(e)
-				}
-			}
-		}
-		time.Sleep(time.Second*1)
-	}
-}

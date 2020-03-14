@@ -12,7 +12,6 @@ import (
 	"io"
 	"os"
 	"runtime"
-	"strconv"
 	"sync"
 	"time"
 )
@@ -316,8 +315,7 @@ func (log *ZinxLogger) SetLogFile(fileDir string, fileName string) {
 	//创建日志文件夹
 	_ = mkdirLog(fileDir)
 	//日志加上日期，加上进程号
-	pid :=os.Getpid()
-	fullPath := fileDir + "/" + fileName+time.Now().Format("20060102")+"."+strconv.FormatInt(int64(pid),10)
+	fullPath := fileDir + "/" + fileName+time.Now().Format("20060102_150405")+".fstlog"
 	if log.checkFileExist(fullPath) {
 		//文件存在，打开
 		file, _ = os.OpenFile(fullPath, os.O_APPEND|os.O_RDWR, 0644)

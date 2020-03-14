@@ -41,6 +41,8 @@ const (
 	MID_CommRet //通用的返回信息
 
 )
+//全局变量，全局对象，避免重复开启对象
+var MessageUtilsObj = &MessageUtils{}
 
 //消息处理工具类
 type MessageUtils struct {
@@ -48,12 +50,12 @@ type MessageUtils struct {
 
 func (m *MessageUtils) WriteString(w io.Writer, data string) {
 	bs := []byte(data)
-	binary.Write(w, binary.BigEndian, int32(len(bs)))
+	binary.Write(w, binary.BigEndian, int16(len(bs)))
 	w.Write(bs)
 }
 
 func (m *MessageUtils) ReadString(r io.Reader) string {
-	var n int32
+	var n int16
 	binary.Read(r, binary.BigEndian, &n)
 	bs := make([]byte, n)
 	io.ReadFull(r, bs)
@@ -80,7 +82,6 @@ func (m *KeepAliveMsg) GetMsg() ziface.IMessage {
 
 //2.LoginMsg 客户端包
 type LoginMsg struct {
-	MessageUtils
 	UserName string
 	Pwd      string
 }
@@ -94,17 +95,16 @@ func NewLoginMsg(u string, p string) *LoginMsg {
 
 func NewLoginMsgByByte(b []byte) *LoginMsg {
 	bytesBuffer := bytes.NewBuffer(b)
-	var m MessageUtils
 	return &LoginMsg{
-		UserName: m.ReadString(bytesBuffer),
-		Pwd:      m.ReadString(bytesBuffer),
+		UserName: MessageUtilsObj.ReadString(bytesBuffer),
+		Pwd:      MessageUtilsObj.ReadString(bytesBuffer),
 	}
 }
 
 func (m *LoginMsg) GetMsg() ziface.IMessage {
 	bytesBuffer := bytes.NewBuffer([]byte{})
-	m.WriteString(bytesBuffer, m.UserName)
-	m.WriteString(bytesBuffer, m.Pwd)
+	MessageUtilsObj.WriteString(bytesBuffer, m.UserName)
+	MessageUtilsObj.WriteString(bytesBuffer, m.Pwd)
 	return znet.NewMsgPackage(MID_Login, bytesBuffer.Bytes())
 }
 
@@ -142,7 +142,6 @@ func (m *LoginRetMsg) GetMsg() ziface.IMessage {
 
 //4.CheckFileMsg
 type CheckFileMsg struct {
-	MessageUtils
 	Filepath  string        //校验文件路径
 	Check     []byte        //校验文件MD5（16 byte）
 	CheckType CheckFileType //校验文件类型 0:不校验  1:size校验 2:fastmd5 3:fullmd5
@@ -158,9 +157,9 @@ func NewCheckFileMsg(fp string, ck []byte, ct CheckFileType) *CheckFileMsg {
 
 func NewCheckFileMsgByByte(b []byte) *CheckFileMsg {
 	bytesBuffer := bytes.NewBuffer(b)
-	var m MessageUtils
+
 	var c CheckFileMsg
-	c.Filepath = m.ReadString(bytesBuffer)
+	c.Filepath = MessageUtilsObj.ReadString(bytesBuffer)
 	c.Check = make([]byte, 16)
 	bytesBuffer.Read(c.Check)
 	ct, _ := bytesBuffer.ReadByte()
@@ -170,7 +169,7 @@ func NewCheckFileMsgByByte(b []byte) *CheckFileMsg {
 
 func (m *CheckFileMsg) GetMsg() ziface.IMessage {
 	bytesBuffer := bytes.NewBuffer([]byte{})
-	m.WriteString(bytesBuffer, m.Filepath)
+	MessageUtilsObj.WriteString(bytesBuffer, m.Filepath)
 	bytesBuffer.Write(m.Check)
 	bytesBuffer.WriteByte(byte(m.CheckType))
 
@@ -179,7 +178,6 @@ func (m *CheckFileMsg) GetMsg() ziface.IMessage {
 
 //----------------------------------------------------------------------------------------MID_Request
 type RequestMsg struct {
-	MessageUtils
 	SecId uint32 //发送请求的ID
 	MsgId uint32 //子消息ID
 	Data  []byte //返回的数据包
@@ -213,7 +211,6 @@ func (m *RequestMsg) GetMsg() ziface.IMessage {
 
 //----------------------------------------------------------------------------------------MID_Request
 type ResponseMsg struct {
-	MessageUtils
 	SecId uint32 //发送请求的ID
 	MsgId uint32 //子消息ID
 	Data  []byte //返回的数据包
@@ -247,7 +244,6 @@ func (m *ResponseMsg) GetMsg() ziface.IMessage {
 
 //----------------------------------------------------------------------------------------CheckFileRetMsg
 type CheckFileRetMsg struct {
-	MessageUtils
 	Filepaht string //校验文件路径
 	CheckRet byte   //校验文件结果 1：需要上传 2:不需要上传 3:被别的客户端锁定，无需上传
 }
@@ -261,23 +257,21 @@ func NewCheckFileRetMsg(fp string, ct byte) *CheckFileRetMsg {
 
 func NewCheckFileRetMsgByByte(b []byte) *CheckFileRetMsg {
 	bytesBuffer := bytes.NewBuffer(b)
-	var m MessageUtils
 	var c CheckFileRetMsg
-	c.Filepaht = m.ReadString(bytesBuffer)
+	c.Filepaht = MessageUtilsObj.ReadString(bytesBuffer)
 	c.CheckRet, _ = bytesBuffer.ReadByte()
 	return &c
 }
 
 func (m *CheckFileRetMsg) GetMsg() ziface.IMessage {
 	bytesBuffer := bytes.NewBuffer([]byte{})
-	m.WriteString(bytesBuffer, m.Filepaht)
+	MessageUtilsObj.WriteString(bytesBuffer, m.Filepaht)
 	bytesBuffer.WriteByte(m.CheckRet)
 	return znet.NewMsgPackage(MID_CheckFileRet, bytesBuffer.Bytes())
 }
 
 //----------------------------------------------------------------------------------------MID_SendFileReq 发送上传文件请求
 type SendFileReqMsg struct {
-	MessageUtils
 	ReqId        uint32        //请求的ID
 	Flen         int64         //文件大小
 	FlastModTime int64         //文件的最后修改时间,秒
@@ -302,7 +296,7 @@ func NewSendFileReqMsg(reqid uint32, fl int64, modtime int64, cbyte []byte, ctyp
 
 func NewSendFileReqMsgByByte(b []byte) *SendFileReqMsg {
 	bytesBuffer := bytes.NewBuffer(b)
-	var m MessageUtils
+
 	var c SendFileReqMsg
 	binary.Read(bytesBuffer, binary.BigEndian, &c.ReqId)
 	binary.Read(bytesBuffer, binary.BigEndian, &c.Flen)
@@ -313,7 +307,7 @@ func NewSendFileReqMsgByByte(b []byte) *SendFileReqMsg {
 	ct, _ := bytesBuffer.ReadByte()
 	c.CheckType = CheckFileType(ct)
 	c.IsUpload, _ = bytesBuffer.ReadByte()
-	c.Filepath = m.ReadString(bytesBuffer)
+	c.Filepath = MessageUtilsObj.ReadString(bytesBuffer)
 	return &c
 }
 
@@ -325,7 +319,7 @@ func (m *SendFileReqMsg) GetMsg() ziface.IMessage {
 	bytesBuffer.Write(m.Check)
 	bytesBuffer.WriteByte(byte(m.CheckType))
 	bytesBuffer.WriteByte(m.IsUpload)
-	m.WriteString(bytesBuffer, m.Filepath)
+	MessageUtilsObj.WriteString(bytesBuffer, m.Filepath)
 	return znet.NewMsgPackage(MID_SendFileReq, bytesBuffer.Bytes())
 }
 
@@ -436,7 +430,6 @@ func (m *SendFileRetMsg) GetMsg() ziface.IMessage {
 
 //-------------------------------------------------------------MID_DeleteFileReq 删除某个文件/或者目录
 type DeleteFileReqMsg struct {
-	MessageUtils
 	SecId    uint32 //消息序列号ID
 	FileType byte   //0:文件  1：目录
 	Filepath string //目标文件路径
@@ -452,11 +445,10 @@ func NewDeleteFileRetMsg(secid uint32, fileType byte, fp string) *DeleteFileReqM
 
 func NewDeleteFileReqMsgByByte(b []byte) *DeleteFileReqMsg {
 	bytesBuffer := bytes.NewBuffer(b)
-	var m MessageUtils
 	var c DeleteFileReqMsg
 	binary.Read(bytesBuffer, binary.BigEndian, &c.SecId)
 	c.FileType, _ = bytesBuffer.ReadByte()
-	c.Filepath = m.ReadString(bytesBuffer)
+	c.Filepath = MessageUtilsObj.ReadString(bytesBuffer)
 	return &c
 }
 
@@ -464,13 +456,12 @@ func (m *DeleteFileReqMsg) GetMsg() ziface.IMessage {
 	bytesBuffer := bytes.NewBuffer([]byte{})
 	binary.Write(bytesBuffer, binary.BigEndian, m.SecId)
 	bytesBuffer.WriteByte(m.FileType)
-	m.WriteString(bytesBuffer, m.Filepath)
+	MessageUtilsObj.WriteString(bytesBuffer, m.Filepath)
 	return znet.NewMsgPackage(MID_DeleteFileReq, bytesBuffer.Bytes())
 }
 
 //-------------------------------------------------------------MID_MoveFileReq 删除某个文件/或者目录
 type MoveFileReqMsg struct {
-	MessageUtils
 	SecId       uint32 //消息序列号ID
 	OpType      byte   //0:copy  1：move
 	SrcFilepath string //源文件路径
@@ -488,12 +479,11 @@ func NewMoveFileReqMsg(secid uint32, opType byte, fp string, dstFilepath string)
 
 func NewMoveFileReqMsgByByte(b []byte) *MoveFileReqMsg {
 	bytesBuffer := bytes.NewBuffer(b)
-	var m MessageUtils
 	var c MoveFileReqMsg
 	binary.Read(bytesBuffer, binary.BigEndian, &c.SecId)
 	c.OpType, _ = bytesBuffer.ReadByte()
-	c.SrcFilepath = m.ReadString(bytesBuffer)
-	c.DstFilepath = m.ReadString(bytesBuffer)
+	c.SrcFilepath = MessageUtilsObj.ReadString(bytesBuffer)
+	c.DstFilepath = MessageUtilsObj.ReadString(bytesBuffer)
 	return &c
 }
 
@@ -501,14 +491,13 @@ func (m *MoveFileReqMsg) GetMsg() ziface.IMessage {
 	bytesBuffer := bytes.NewBuffer([]byte{})
 	binary.Write(bytesBuffer, binary.BigEndian, m.SecId)
 	bytesBuffer.WriteByte(m.OpType)
-	m.WriteString(bytesBuffer, m.SrcFilepath)
-	m.WriteString(bytesBuffer, m.DstFilepath)
+	MessageUtilsObj.WriteString(bytesBuffer, m.SrcFilepath)
+	MessageUtilsObj.WriteString(bytesBuffer, m.DstFilepath)
 	return znet.NewMsgPackage(MID_MoveFileReq, bytesBuffer.Bytes())
 }
 
 //-------------------------------------------------------------MID_CommRet 通用的返回信息
 type CommRetMsg struct {
-	MessageUtils
 	ReqId   uint32 //请求的ID
 	RetCode int16  //返回码 0:成功，1：失败  2:服务器错误
 	RetMsg  string //返回消息
@@ -528,14 +517,13 @@ func NewCommRetMsg(reqId uint32, retCode int16, retMsg string, extInt int64, ext
 
 func NewCommRetMsgByByte(b []byte) *CommRetMsg {
 	bytesBuffer := bytes.NewBuffer(b)
-	var m MessageUtils
 	var c CommRetMsg
 	binary.Read(bytesBuffer, binary.BigEndian, &c.ReqId)
 	binary.Read(bytesBuffer, binary.BigEndian, &c.RetCode)
 	binary.Read(bytesBuffer, binary.BigEndian, &c.ExtInt)
 
-	c.RetMsg = m.ReadString(bytesBuffer)
-	c.ExtStr = m.ReadString(bytesBuffer)
+	c.RetMsg = MessageUtilsObj.ReadString(bytesBuffer)
+	c.ExtStr = MessageUtilsObj.ReadString(bytesBuffer)
 	return &c
 }
 
@@ -544,7 +532,7 @@ func (m *CommRetMsg) GetMsg() ziface.IMessage {
 	binary.Write(bytesBuffer, binary.BigEndian, m.ReqId)
 	binary.Write(bytesBuffer, binary.BigEndian, m.RetCode)
 	binary.Write(bytesBuffer, binary.BigEndian, m.ExtInt)
-	m.WriteString(bytesBuffer, m.RetMsg)
-	m.WriteString(bytesBuffer, m.ExtStr)
+	MessageUtilsObj.WriteString(bytesBuffer, m.RetMsg)
+	MessageUtilsObj.WriteString(bytesBuffer, m.ExtStr)
 	return znet.NewMsgPackage(MID_CommRet, bytesBuffer.Bytes())
 }
