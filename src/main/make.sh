@@ -8,7 +8,8 @@ go build Server.go
 
 #ps -ef | grep /FastSyncServer | awk '{print $2}' | xargs kill -9
 #kill -9 `pidof FastSyncServer`
-cd /home/ap/webapp/
+cd /home/ap/webapp/FastSync
+nohup /home/ap/webapp/FastSync/FastSyncServer >/dev/null 2>&1&
 nohup ./FastSyncServer >/dev/null 2>&1&
 nohup /home/ap/ccb/FastSyncClient/FastSyncDir -p / -t 0 -c 4 >/dev/null 2>&1&
 

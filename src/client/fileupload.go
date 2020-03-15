@@ -142,7 +142,7 @@ func (n *FileUpload) doUploadChan2(l *LocalFile) (byte, error) {
 					return 1, errors.New("服务端io失败，无法上传")
 				}
 				if data.RetCode == 2 {
-					return 1, errors.New("文件一致，无需上传")
+					return 2, errors.New("文件一致，无需上传")
 				}
 				if data.RetCode == 3 {
 					return 13, errors.New("文件被其他客户端锁定，无法上传")

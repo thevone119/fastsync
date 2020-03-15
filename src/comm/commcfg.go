@@ -3,6 +3,8 @@ package comm
 import (
 	"encoding/json"
 	"io/ioutil"
+	"os"
+	"path/filepath"
 	"zinx/zlog"
 )
 
@@ -27,12 +29,19 @@ var CommConfigObj *CommConfig
 //读取用户的配置文件
 func (g *CommConfig) Reload() {
 
-	if confFileExists, _ := PathExists(g.ConfFilePath); confFileExists != true {
-		//fmt.Println("Config File ", g.ConfFilePath , " is not exist!!")
-		return
+
+	spath:=g.ConfFilePath
+	if confFileExists, _ := PathExists(spath); confFileExists != true {
+		path, _ := filepath.Abs(filepath.Dir(os.Args[0]))
+		spath = filepath.Join(path,g.ConfFilePath)
 	}
 
-	data, err := ioutil.ReadFile(g.ConfFilePath)
+	if confFileExists, _ := PathExists(spath); confFileExists != true {
+		return
+	}
+	zlog.Debug("comm conf",spath)
+
+	data, err := ioutil.ReadFile(spath)
 	if err != nil {
 		panic(err)
 	}

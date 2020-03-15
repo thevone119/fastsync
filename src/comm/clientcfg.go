@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"zinx/zlog"
@@ -67,12 +68,17 @@ func (g *clientConfig) GetRemoteName(i int) string{
 //读取用户的配置文件
 func (g *clientConfig) reload() {
 
-	if confFileExists, _ := PathExists(g.ConfFilePath); confFileExists != true {
-		//fmt.Println("Config File ", g.ConfFilePath , " is not exist!!")
-		return
+	spath:=g.ConfFilePath
+	if confFileExists, _ := PathExists(spath); confFileExists != true {
+		path, _ := filepath.Abs(filepath.Dir(os.Args[0]))
+		spath = filepath.Join(path,g.ConfFilePath)
 	}
 
-	data, err := ioutil.ReadFile(g.ConfFilePath)
+	if confFileExists, _ := PathExists(spath); confFileExists != true {
+		return
+	}
+	zlog.Debug("client conf",spath)
+	data, err := ioutil.ReadFile(spath)
 	if err != nil {
 		panic(err)
 	}

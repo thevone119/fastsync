@@ -33,7 +33,7 @@ func main() {
 	zlog.Info("开始执行全量文件同步，同步时间:", ltime, "秒，同步路径:", "文件校验类型:", filecheck,"是否记录同步文件日志:",islog)
 	zlog.Info("当前程序运行目录为:",comm.CURR_RUN_PATH,",程序日志将记录在此目录下")
 	if islog==0{
-		client.LocalFileHandle.IsLog=false
+		client.LocalFileHandle.IsLog=true
 	}else{
 		client.LocalFileHandle.IsLog=true
 	}
