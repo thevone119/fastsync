@@ -3,7 +3,6 @@ package zlog
 /*
 	日志类全部方法 及 API
 
-	Add By Aceld(刘丹冰) 2019-4-23
 */
 
 import (
@@ -69,6 +68,10 @@ type ZinxLogger struct {
 	debugClose bool
 	//获取日志文件名和代码上述的runtime.Call 的函数调用层数
 	calldDepth	int
+	//日志的日期，每天一个文件
+	logDay int
+	fileDir string
+	fileName string
 }
 
 /*
@@ -80,7 +83,7 @@ type ZinxLogger struct {
 func NewZinxLog(out io.Writer, prefix string, flag int) *ZinxLogger {
 
 	//默认 debug打开， calledDepth深度为2,ZinxLogger对象调用日志打印方法最多调用两层到达output函数
-	zlog := &ZinxLogger{out: out, prefix: prefix, flag: flag, file:nil, debugClose:false, calldDepth:2}
+	zlog := &ZinxLogger{out: out, prefix: prefix, flag: flag, file:nil, debugClose:false, calldDepth:2,logDay:time.Now().YearDay(),fileDir:"./syslog",fileName:""}
 	//设置log对象 回收资源 析构方法(不设置也可以，go的Gc会自动回收，强迫症没办法)
 	runtime.SetFinalizer(zlog, CleanZinxLog)
 	return zlog
@@ -165,8 +168,14 @@ func (log *ZinxLogger) formatHeader(buf *bytes.Buffer, t time.Time, file string,
    输出日志文件,原方法
 */
 func (log *ZinxLogger) OutPut(level int, s string) error {
-
 	now := time.Now() // 得到当前时间
+	//按日输出日志
+	if now.YearDay()!=log.logDay{
+		log.logDay=now.YearDay()
+		if len(log.fileName)>0{
+			log.SetLogFile(log.fileDir,log.fileName)
+		}
+	}
 	var file string   //当前调用日志接口的文件名称
 	var line int      //当前代码行数
 	log.mu.Lock()
@@ -307,11 +316,14 @@ func (log *ZinxLogger) SetPrefix(prefix string){
 }
 
 
-
 //设置日志文件输出
 func (log *ZinxLogger) SetLogFile(fileDir string, fileName string) {
-	var file *os.File
+	log.mu.Lock()
+	defer log.mu.Unlock()
 
+	var file *os.File
+	log.fileDir=fileDir
+	log.fileName=fileName
 	//创建日志文件夹
 	_ = mkdirLog(fileDir)
 	//日志加上日期，加上进程号
@@ -323,9 +335,6 @@ func (log *ZinxLogger) SetLogFile(fileDir string, fileName string) {
 		//文件不存在，创建
 		file, _ = os.OpenFile(fullPath, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
 	}
-
-	log.mu.Lock()
-	defer log.mu.Unlock()
 
 	//关闭之前绑定的文件
 	log.closeFile()

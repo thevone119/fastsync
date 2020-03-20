@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 	"utils"
+	"zinx/zlog"
 )
 
 //全局对象
@@ -79,13 +80,16 @@ func (s *syncFileHandle) ClearTimeout() {
 		s.flock.Lock()
 		defer s.flock.Unlock()
 		clearTime := ct - 60*3
+		clearCount:=0
 		for k, v := range s.fmap {
 			if v.LastTime < clearTime {
 				v.Close()
 				delete(s.fhmap, v.FileId)
 				delete(s.fmap, k)
+				clearCount++
 			}
 		}
+		zlog.Info("Clear FileHandle Timeout count:",clearCount)
 	}
 }
 

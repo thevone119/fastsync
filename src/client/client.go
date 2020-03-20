@@ -3,6 +3,8 @@ package client
 import (
 	"comm"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 	"zinx/zlog"
@@ -13,7 +15,9 @@ import (
 //2.其他组件，寻捆绑到这个客户端组件上，实现组件间的交互处理
 type Client struct {
 	client *ClientUpManager
-
+	NextClearTime int64	//下次清理日志的时间
+	CurrUnixTime int64		//当前时间，秒
+	NextAllSyncTime  int64	//下次全量同步时间，每分钟校验一次
 	isRun bool
 }
 
@@ -21,6 +25,9 @@ type Client struct {
 func NewClient() *Client{
 	return &Client{
 		isRun:false,
+		NextClearTime:0,
+		NextAllSyncTime:0,
+		CurrUnixTime:0,
 	}
 }
 
@@ -88,7 +95,9 @@ func (c *Client) goDoHandle(){
 		if !c.isRun{
 			return
 		}
+		c.CurrUnixTime=time.Now().Unix()
 		c.goDoHandle2()
+
 		time.Sleep(time.Millisecond*500)
 	}
 }
@@ -114,6 +123,8 @@ func (c *Client) goDoHandle2(){
 		}
 	}()
 	c.DoHandle()
+	c.DoClearLog()
+	c.DoAllSync()
 }
 
 //处理，无限循环处理，携程调用
@@ -163,8 +174,90 @@ func (c *Client) DoFileChange(){
 		if strings.Index(e.Value.(string),"del_")==0{
 			c.client.DeleteFile(e.Value.(string)[4:])
 		}else{
-			c.client.SyncFile(e.Value.(string),comm.CheckFileType(3),true)
+			c.client.SyncFile(e.Value.(string),comm.FCHECK_FULLMD5_CHECK,true)
 		}
 		//fmt.Print(e.Value) //输出list的值,01234
 	}
+}
+
+//清理日志，10分钟一次
+func (c *Client) DoClearLog(){
+	//错误拦截，避免出现意外错误，程序退出
+	defer func() {
+		//恢复程序的控制权
+		if p := recover(); p != nil {
+			zlog.Error("DoClearLog 处理错误", p)
+		}
+	}()
+	if c.CurrUnixTime<c.NextClearTime{
+		return
+	}
+	c.NextClearTime=c.CurrUnixTime+60*10
+	cday:=comm.ClientConfigObj.LogCleanDay
+	if cday<1{
+		cday=1
+	}
+	ctime:=time.Duration(cday*24)*time.Hour
+	now:=time.Now()
+	zlog.Info("clear log")
+	//清理当前目录下的，超过X天的*.fstlog
+	filepath.Walk(comm.CURR_RUN_PATH, func(path string, info os.FileInfo, err error) error {
+		if info.IsDir() {
+			return nil
+		}
+		if m,_:=filepath.Match("*.fstlog",info.Name());m{
+			if now.Sub(info.ModTime()) > ctime {
+				os.Remove(path)
+				zlog.Info("delete log",path)
+				return nil
+			}
+		}
+		return nil
+	})
+}
+
+
+//自动同步，5秒一次，避免错过分钟，如果校验时间正确，则加2分钟，错过当前时间
+func (c *Client) DoAllSync(){
+	//错误拦截，避免出现意外错误，程序退出
+	defer func() {
+		//恢复程序的控制权
+		if p := recover(); p != nil {
+			zlog.Error("DoAllSync 处理错误", p)
+		}
+	}()
+	if c.CurrUnixTime<c.NextAllSyncTime{
+		return
+	}
+	c.NextAllSyncTime=c.CurrUnixTime+5
+
+	//星期判断
+	now:=time.Now()
+
+	match:=false
+	for _,v:=range comm.ClientConfigObj.AllSyncWeekday{
+		if int(now.Weekday())==v{
+			match=true
+		}
+	}
+	if !match{
+		return
+	}
+	match=false
+
+	//判断时间符合
+	for _,v:=range comm.ClientConfigObj.AllSyncTimeOfDay{
+		if now.Format("15:04")==v{
+			match=true
+		}
+	}
+	if !match{
+		return
+	}
+	//时间符合，则错开当前这个时间
+	c.NextAllSyncTime=c.CurrUnixTime+70
+
+	//调用外部
+	zlog.Info("开始进行全量数据同步，调用全量数据同步程序")
+
 }

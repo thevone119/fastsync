@@ -90,7 +90,7 @@ func (c *ClientUpManager) SyncFile(lp string, cktype comm.CheckFileType,resend b
 		}
 	}()
 	lp,_=filepath.Abs(lp)
-	zlog.Debug("SyncFile", lp)
+	//zlog.Debug("SyncFile", lp)
 
 	rlp, err := comm.ClientConfigObj.GetRelativePath(lp)
 	if err != nil {

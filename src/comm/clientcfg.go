@@ -28,6 +28,9 @@ type clientConfig struct {
 	ConfFilePath string
 	RemotePath   []string //推送端路径，多个推送端
 	remoteName   []string //推送端路径，多个推送端的名称ip+端口+路径
+
+	AllSyncWeekday []int	//全量同步的日，周中的日 [1,2,3,4,5,6,7]
+	AllSyncTimeOfDay []string //全量同步的时间，["04:05","05:06"]
 }
 
 /*

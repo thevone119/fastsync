@@ -78,7 +78,7 @@ func goTimingTask2(){
 			zlog.Error("5秒定时任务出现错误", err)
 		}
 	}()
-	zlog.Debug("执行5秒定时清理内存")
+	//zlog.Debug("执行5秒定时清理内存")
 	//清理文件SyncFileHandle
 	server.SyncFileHandle.ClearTimeout()
 }

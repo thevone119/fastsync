@@ -24,7 +24,7 @@ const (
 
 //定义一些全局变量，方便读取
 var CURR_PID=os.Getpid()//当前启动的进程ID
-var CURR_RUN_PATH=""	//当前运行程序目录  /home/ap/ccb/nitify
+var CURR_RUN_PATH=""	//当前运行程序目录  /home/ap/ccb/FastSync
 var CURR_RUN_NAME=""	//当前运行程序名称	xxx.exe
 
 var NOTIFY_PATH = "notifylog"	//日志监控目录，没有则自动创建
