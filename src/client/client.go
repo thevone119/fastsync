@@ -34,9 +34,10 @@ func (c *Client) Start() {
 	c.client = NewClientUpManager()
 	//睡眠1秒等待网络连接
 	time.Sleep(1 * time.Second)
+
 	//开启文件监听
 	for _, v := range comm.ClientConfigObj.NotifyMonitor {
-		if strings.Index(v,comm.ClientConfigObj.LocalPath)<0{
+		if !comm.ClientConfigObj.IsLocalPath(v){
 			continue
 		}
 		fs := comm.NewFSWatch(v)
@@ -45,14 +46,33 @@ func (c *Client) Start() {
 
 
 	//监控文件
-	for _, v := range comm.ClientConfigObj.LogMonitor {
-		f := comm.NewFileChan(v , "*")
+	for i, v := range comm.ClientConfigObj.LogMonitor {
+		sep:=" "
+		if len(comm.ClientConfigObj.LogMonitorSep)>i{
+			sep=comm.ClientConfigObj.LogMonitorSep[i]
+		}
+
+		f := comm.NewLogWatch(v,sep)
 		f.Start()
 	}
 
+	//轮训监控
+	if len(comm.ClientConfigObj.PollMonitor)>0{
+		f := comm.NewPollWatch(comm.ClientConfigObj.PollMonitor )
+		f.Start()
+	}
+
+
+
+
+
 	//开启线程轮询
 	c.isRun=true
+	//开2个线程，一个是不耗时的，一个是耗时的
 	go c.goDoHandle()
+
+	go c.goDoUpload()
+
 }
 
 //结束
@@ -69,9 +89,20 @@ func (c *Client) goDoHandle(){
 			return
 		}
 		c.goDoHandle2()
-		time.Sleep(time.Millisecond*200)
+		time.Sleep(time.Millisecond*500)
 	}
 }
+
+func (c *Client) goDoUpload(){
+	for{
+		if !c.isRun{
+			return
+		}
+		c.goDoUpload2()
+		time.Sleep(time.Millisecond*500)
+	}
+}
+
 
 //处理，无限循环处理，携程调用
 func (c *Client) goDoHandle2(){
@@ -85,10 +116,55 @@ func (c *Client) goDoHandle2(){
 	c.DoHandle()
 }
 
+//处理，无限循环处理，携程调用
+func (c *Client) goDoUpload2(){
+	//错误拦截,针对上传过程中遇到的错误进行拦截，避免出现意外错误，程序退出
+	defer func() {
+		//恢复程序的控制权
+		if p := recover(); p != nil {
+			zlog.Error("DoUpload 处理错误", p)
+		}
+	}()
+	c.DoUpload()
+}
+
 
 //处理，无限循环处理，携程调用
 func (c *Client) DoHandle(){
 	//
 	//
 	//
+	LocalFileHandle.ClearTimeout()
+
+
+}
+
+
+//处理，无限循环处理，携程调用
+func (c *Client) DoUpload(){
+	//
+	//
+	//
+	c.DoFileChange()
+	c.DoReSendFile()
+}
+
+//重发失败的文件处理
+func (c *Client) DoReSendFile(){
+	l:=LocalFileHandle.GetReSend()
+	for e := l.Front(); e != nil; e = e.Next() {
+		c.client.ReSyncFile(e.Value.(*LocalFile))
+	}
+}
+
+func (c *Client) DoFileChange(){
+	l:=comm.FileChangeMonitorObj.GetQueue(200)
+	for e := l.Front(); e != nil; e = e.Next() {
+		if strings.Index(e.Value.(string),"del_")==0{
+			c.client.DeleteFile(e.Value.(string)[4:])
+		}else{
+			c.client.SyncFile(e.Value.(string),comm.CheckFileType(3),true)
+		}
+		//fmt.Print(e.Value) //输出list的值,01234
+	}
 }

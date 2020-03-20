@@ -1,7 +1,6 @@
 package comm
 
 import (
-	"fmt"
 	"testing"
 )
 
@@ -9,11 +8,6 @@ func TestFilechan(t *testing.T) {
 	LeveldbDB.Open()
 	f := NewFileChan("E:/TEST/test2", "*.txt")
 	f.Start()
-	for {
-		select {
-		case l := <-f.LineChan:
-			fmt.Println(l)
-		}
-	}
+
 
 }

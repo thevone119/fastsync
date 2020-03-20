@@ -76,22 +76,22 @@ func (f *FileChan) goHandle2(){
 				return nil
 			}
 			//获取文件
-			fl := NewFileLine(p)
+			fl := NewFileLine(p," ")
 			if fl.FlastRedTime > info.ModTime().UnixNano() {
 				return nil
 			}
 			fl.FlastRedTime = time.Now().UnixNano()
-			err = fl.ReadLines()
+			err = fl.ReadLines(1000)
 			return err
 		})
 	}else{
 		//获取文件
-		fl := NewFileLine(f.dir)
+		fl := NewFileLine(f.dir," ")
 		if fl.FlastRedTime > fi.ModTime().UnixNano() {
 			return
 		}
 		fl.FlastRedTime = time.Now().UnixNano()
-		fl.ReadLines()
+		fl.ReadLines(1000)
 	}
 }
 
@@ -112,9 +112,10 @@ type FileLine struct {
 	FOpen        bool     //文件是否打开
 	filestart    int64    //当前文件位置，这个保存到数据库中的。
 	FH           *os.File //本机文件指针,只读方式打开
+	sep 		 string
 }
 
-func NewFileLine(fp string) *FileLine {
+func NewFileLine(fp string,sep string) *FileLine {
 	fl, ok := _file_line_map[fp]
 	if ok {
 		return fl
@@ -124,7 +125,9 @@ func NewFileLine(fp string) *FileLine {
 		FOpen:        false,
 		filestart:    0,
 		FlastModTime: 0,
+		sep:sep,
 	}
+
 	s,err:=LeveldbDB.GetInt64([]byte("FL_"+fp))
 
 	if err==nil&&s>0{
@@ -161,21 +164,23 @@ func (f *FileLine) close() {
 
 //处理某行记录，空格隔开
 func (f *FileLine) doLine(l string) {
-	s:=strings.Split(l, " ")
+	s:=strings.Split(l, f.sep)
+
 	for _, v := range s {
-		if strings.Index(v,BASE_PATH)>=0{
-			FileChangeMonitorObj.AddPath(v)
-		}
+		//这里还有点问题
+		FileChangeMonitorObj.AddLine(v)
 	}
 }
 
 //一次读取多行
-func (f *FileLine) ReadLines() ( error) {
-	if !f.FOpen {
-		return  errors.New("file on open")
-	}
+func (f *FileLine) ReadLines(mxline int) (error) {
+
 	f.open()
 	defer f.close()
+	if !f.FOpen {
+		return  errors.New("file not open")
+	}
+
 	//
 	//超过最大的，就是文件被重置了。重新来读
 	if f.filestart > 0 {
@@ -190,16 +195,23 @@ func (f *FileLine) ReadLines() ( error) {
 		return  err
 	}
 	bf:=bufio.NewReader(f.FH)
-
+	recount:=0
 	for {
+		if recount>mxline{
+			break
+		}
 		l, err := bf.ReadString('\n')
 		if err != nil {
 			break
 		}
 		l=strings.TrimRight(l, "\n")
-		if strings.Index(l,BASE_PATH)>=0{
-			f.doLine(l)
-		}
+		l=strings.TrimSpace(l)
+		f.doLine(l)
+		recount++
+	}
+	//一行都没读到，则直接返回
+	if recount==0{
+		return nil
 	}
 	sk, _ = f.FH.Seek(0, io.SeekCurrent)
 	f.filestart = sk

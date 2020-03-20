@@ -74,14 +74,14 @@ func (c *ClientUpManager) SyncPath(ltime int64, lp string, filecheck comm.CheckF
 		if (currtime-info.ModTime().Unix())<2{
 			return nil
 		}
-		c.SyncFile(path, filecheck)
+		c.SyncFile(path, filecheck,false)
 		return nil
 	})
 }
 
 //同步某个文件到服务器,本机文件新增，修改的时候，就调用这个方法
-//cktype:文件的校验类型 //0:不校验  1:size校验 2:fastmd5  3:fullmd5
-func (c *ClientUpManager) SyncFile(lp string, cktype comm.CheckFileType) {
+//cktype:文件的校验类型 //0:不校验  1:size校验 2:fastmd5  3:fullmd5 4
+func (c *ClientUpManager) SyncFile(lp string, cktype comm.CheckFileType,resend bool) {
 	//错误拦截,针对上传过程中遇到的错误进行拦截，避免出现意外错误，程序退出
 	defer func() {
 		//恢复程序的控制权
@@ -99,6 +99,17 @@ func (c *ClientUpManager) SyncFile(lp string, cktype comm.CheckFileType) {
 	}
 	//1.读取判断本地文件是否存在，大小，MD5等
 	ul := NewLocalFile(len(comm.ClientConfigObj.RemotePath),lp, rlp, cktype)
+
+	//不重发的，则直接设置已重发100
+	if !resend{
+		ul.ReSendCount=100
+	}
+
+	if ul.Flen<=0{
+		zlog.Error("空文件:", lp)
+		ul.Close()
+		return
+	}
 	if !ul.FOpen{
 		zlog.Error("打开文件失败:", lp)
 		ul.Close()
@@ -106,6 +117,7 @@ func (c *ClientUpManager) SyncFile(lp string, cktype comm.CheckFileType) {
 	}else{
 		LocalFileHandle.AddLocalFile(ul)
 	}
+
 	//加入等待，全局等待
 	SyncFileWG.Add(len(c.RemoteUpLoad))
 	//放入这个监控队列
@@ -115,6 +127,22 @@ func (c *ClientUpManager) SyncFile(lp string, cktype comm.CheckFileType) {
 	}
 	//这里如果发完了，这个LocalFile要调用关闭方法，释放资源，释放文件的。
 
+}
+
+//重发处理
+func (c *ClientUpManager) ReSyncFile(lf *LocalFile){
+	lf.Init()
+	if lf.Flen<=0{
+		lf.Close()
+		return
+	}
+	//加入等待，全局等待
+	SyncFileWG.Add(len(c.RemoteUpLoad))
+	//放入这个监控队列
+	//c.lfileList.PushBack(ul)
+	for _, fu := range c.RemoteUpLoad {
+		fu.SendUpload(lf)
+	}
 }
 
 //删除服务器中的某个文件,包括文件夹

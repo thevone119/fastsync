@@ -10,8 +10,17 @@ import (
 //测试结论，goleveldb性能非常均衡的一个数据库，内存占用，磁盘占用都比较低
 //bolt速度更快，100万随机读取不到1秒完成。但是写入需要提交后才能读取。基于MMAP，如果每次都写入，则写入速度非常慢。适用于一次写入，频繁读取的场景
 func TestLeveldb(t *testing.T) {
-	test1()
-	fmt.Println(CURR_PID,CURR_RUN_NAME,CURR_RUN_PATH)
+	db, err := leveldb.OpenFile("e:\\test\\test2\\db", nil)
+	if err!=nil{
+		return
+	}
+	db.Put([]byte("keysss"),[]byte("ddd"),nil)
+	v,err:=db.Get([]byte("keysss"),nil)
+	if err!=nil{
+		fmt.Println(err)
+	}else{
+		fmt.Println(v)
+	}
 }
 
 

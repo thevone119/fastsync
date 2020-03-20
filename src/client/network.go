@@ -264,7 +264,7 @@ func (n *NetWork) RemoveCallBack(msgid uint32, cb func(ziface.IMessage)) {
 }
 
 func (n *NetWork) doKeepalive(msg ziface.IMessage) {
-	zlog.Debug("Receive keepalive back")
+	//zlog.Debug("Receive keepalive back")
 }
 
 func (n *NetWork) doResponse(msg ziface.IMessage) {

@@ -35,7 +35,7 @@ func init() {
 	if err != nil {
 		zlog.Error("level db get path err",err)
 	}else {
-		LeveldbDB.DBPath = path+".leveldb"
+		LeveldbDB.DBPath = path+".fstdb"
 	}
 }
 

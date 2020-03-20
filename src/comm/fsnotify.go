@@ -82,6 +82,9 @@ func (w *FSWatch) Start() {
 	}
 	w.watch = wer
 
+	//开启线程对监控返回数据进行处理,先开启处理，避免添加目录的过程太长，中途数据堆积
+	go w.goHandleEvent()
+
 	count := 0
 	now := time.Now()
 	//通过Walk来遍历目录下的所有子目录
@@ -94,12 +97,14 @@ func (w *FSWatch) Start() {
 			if err != nil {
 				return err
 			}
+			if count%1000==0{
+				zlog.Info("已添加监控目录", count,"个")
+			}
 		}
 		return nil
 	})
 	zlog.Info("监控目录服务开启", "监控根目录为:", w.basepath, "子目录数:", count, "监控服务启动耗时:", time.Now().Sub(now))
-	//开启线程对监控返回数据进行处理
-	go w.goHandleEvent()
+
 }
 
 func (w *FSWatch) goHandleEvent() {
@@ -151,6 +156,7 @@ func (w *FSWatch) goHandleEvent() {
 					}
 				}
 				if ev.Op&fsnotify.Chmod == fsnotify.Chmod {
+					//zlog.Debug("修改权限 : ", ev.Name)
 					//fmt.Println("修改权限 : ", ev.Name)
 				}
 			}

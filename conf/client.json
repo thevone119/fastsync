@@ -1,13 +1,16 @@
 {
-  "LocalPath":"e:/project",
-  "NotifyMonitor": ["e:/project"],
-  "PollMonitor": ["e:/project"],
+  "LocalPath":"e:/project/test2",
+  "NotifyMonitor": ["e:/project/test2"],
+  "PollMonitor": ["e:/project2222"],
   "PollTime": 5000,
-  "LogMonitor": ["e:/project"],
+  "LogMonitor": ["e:/project/test2/*.out","e:/project/xx.log"],
+  "LogMonitorSep": ["是:"," "],
   "AllowDelDir": false,
-  "AllowDelFile": true,
-  "filterFiles":["*.swp"],
-  "RemotePath":["easysite|easysite12#$|111.229.241.157:8999/","easysite|easysite12#$|127.0.0.1:8999/","easysite|easysite12#$|127.0.0.1:8999/","easysite|easysite12#$|127.0.0.1:8999/","easysite|easysite12#$|127.0.0.1:8999/"],
+  "AllowDelFile": false,
+  "FilterFiles":["*.swp","*.temp"],
+  "FilterPaths":["e:/project/test2/cn"],
+  "LogCleanDay": 90,
+  "RemotePath":["easysite|easysite12#$|111.229.241.157:8999/"],
   "AllSyncDayOfMonth": [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31],
   "AllSyncTimeOfDay": ["04:05","05:06"]
 }

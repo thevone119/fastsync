@@ -6,7 +6,9 @@ import (
 )
 
 func TestFileinfo(t *testing.T) {
-	f:=NewFFileInfo("E:/go_work/fastsync/fastsyncddd")
+	p:="e:/project/test2/123/test.txt"
+	f:=NewFFileInfo(p)
 	f.ReLoadBase()
-	fmt.Println(f.ModTime,f.IsDir,f.IsExist,f.Size)
+	fmt.Println(p,f.IsExist)
+
 }

@@ -3,6 +3,7 @@ package client
 import (
 	"bytes"
 	"comm"
+	"container/list"
 	"crypto/md5"
 	"encoding/binary"
 	"errors"
@@ -20,6 +21,7 @@ import (
 //全局变量
 var LocalFileHandle=&localFileHandle{
 	fmap:          make(map[uint32]*LocalFile),
+	Refmap:          make(map[uint32]*LocalFile),
 	logDay:-1,
 	IsLog:true,
 }
@@ -30,6 +32,8 @@ var LocalFileHandle=&localFileHandle{
 type localFileHandle struct {
 	//所有的文件上传类记录在这里，用携程去监控上传类是否上传完成，完成了则需要关闭并且释放资源
 	fmap          map[uint32]*LocalFile //filemap
+	//失败重发的记录在这里
+	Refmap          map[uint32]*LocalFile //重发列表
 	llock sync.RWMutex          //读写锁
 	//统计信息
 	UpLoadFileCount int64		//推送文件数
@@ -46,6 +50,9 @@ type localFileHandle struct {
 	//是否记录上传日志？针对全量上传的，不记录日志哦
 	IsLog bool
 }
+
+
+
 
 
 
@@ -92,13 +99,35 @@ func  (s *localFileHandle) UpLoadEndOne(lf *LocalFile){
 			ecount++
 		}
 	}
+	//结束了
 	if scount+ecount>=len(lf.RetCodes){
 		s.SuccUpLoadCount += int64(scount)
 		s.ErrUpLoadCount += int64(ecount)
 		zlog.Debug("Sync end",lf.LPath)
 		lf.Close()
 		delete(s.fmap, lf.Lid)
+		//如果存在错误的，则在这里把错误记录到重发列表
+		if ecount>0 && lf.ReSendCount<2 && len(s.Refmap)<100{
+			lf.ReSendCount++
+			lf.ReSendTime=time.Now().Unix()
+			s.Refmap[lf.Lid]=lf
+		}
 	}
+}
+
+//获取重发的列表
+func  (s *localFileHandle) GetReSend() *list.List{
+	s.llock.Lock()
+	defer s.llock.Unlock()
+	l:=list.New()
+	ct:=time.Now().Unix()-60*5
+	for k, v := range s.Refmap {
+		if v.ReSendTime<ct{
+			l.PushBack(v)
+			delete(s.Refmap,k)
+		}
+	}
+	return l
 }
 
 //打开日志文件
@@ -203,6 +232,9 @@ type LocalFile struct {
 	RetCodes 	[]byte				//各个服务器端上传返回的码，默认初始化为255
 	SUpLoadTime []int64				//各个服务器端开始上传时间,毫秒
 	EUpLoadTime []int64				//各个服务器端结束上传时间,毫秒
+
+	ReSendCount int8				//重发次数
+	ReSendTime int64				//加入重发里的时间
 }
 
 func NewLocalFile(slen int,lp string, rp string, ct comm.CheckFileType) *LocalFile {
@@ -219,6 +251,9 @@ func NewLocalFile(slen int,lp string, rp string, ct comm.CheckFileType) *LocalFi
 		SUpLoadTime:make([]int64, slen),
 		EUpLoadTime:make([]int64, slen),
 		FlastRead: 0,
+		ReSendCount:0,
+		ReSendTime:0,
+
 	}
 	//默认都是255，还未开始上传
 	for i:=0;i<slen;i++{
@@ -226,12 +261,12 @@ func NewLocalFile(slen int,lp string, rp string, ct comm.CheckFileType) *LocalFi
 	}
 
 	//这里做一些初始化等处理
-	l.init()
+	l.Init()
 
 	return &l
 }
 
-func (this *LocalFile) init(){
+func (this *LocalFile) Init(){
 	//错误拦截,针对上传过程中遇到的错误进行拦截，避免出现意外错误，程序退出
 	defer func() {
 		//恢复程序的控制权
@@ -271,7 +306,6 @@ func (this *LocalFile) init2() {
 	var result []byte
 	if this.Flen < MAX_CACHE_SIZE {
 		//所有数据读入缓存
-
 		this.CacheFile = make([]byte, this.Flen)
 		_, err := this.FH.Read(this.CacheFile)
 		if err != nil {
@@ -416,7 +450,7 @@ func (this *LocalFile) Log(){
 	str.WriteString("|")
 	str.WriteString("u")
 	str.WriteString("|")
-	str.WriteString(this.LPath)
+	str.WriteString(this.RPath)
 	//循环输出服务器传输结果
 	for i:=0;i<len(this.RetCodes);i++{
 		str.WriteString("|")

@@ -57,6 +57,7 @@ func (n *FileUpload) SendUpload(l *LocalFile) {
 	n.upLoads <- l
 }
 
+
 //协程进行上传处理
 func (n *FileUpload) goupLoadProcess() {
 	for {
@@ -64,14 +65,8 @@ func (n *FileUpload) goupLoadProcess() {
 		case data, ok := <-n.upLoads:
 			if ok {
 				//这个无论如何必须有返回
-				data.SUpLoadTime[n.netclient.Id]=time.Now().UnixNano() / 1e6
 				//调用上传处理
-				ret, _ := n.doUploadChan(data)
-				//返回码记录在这里汇总
-				data.EUpLoadTime[n.netclient.Id]=time.Now().UnixNano() / 1e6
-				data.RetCodes[n.netclient.Id]=ret
-				//结束
-				LocalFileHandle.UpLoadEndOne(data)
+				n.doUploadChan(data)
 			}
 		}
 	}
@@ -97,7 +92,21 @@ func (n *FileUpload) doUploadChan(l *LocalFile) (retb byte, err error) {
 			zlog.Error("文件上传发送意外错误", p)
 		}
 	}()
-	return n.doUploadChan2(l)
+
+	//如果是重发的，已经成功的不再重发
+	if l.RetCodes[n.netclient.Id]==0||l.RetCodes[n.netclient.Id]==2{
+		return l.RetCodes[n.netclient.Id],nil
+	}
+
+	l.SUpLoadTime[n.netclient.Id]=time.Now().UnixNano() / 1e6
+	retb,err=n.doUploadChan2(l)
+	//返回码记录在这里汇总
+	l.EUpLoadTime[n.netclient.Id]=time.Now().UnixNano() / 1e6
+	l.RetCodes[n.netclient.Id]=retb
+	//结束
+	LocalFileHandle.UpLoadEndOne(l)
+
+	return
 }
 
 //管道上传，单线程,校验是否需要上传，如果需要上传再进行第3步的文件上传

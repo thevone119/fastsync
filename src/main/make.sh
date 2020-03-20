@@ -13,6 +13,9 @@ nohup /home/ap/webapp/FastSync/FastSyncServer >/dev/null 2>&1&
 nohup ./FastSyncServer >/dev/null 2>&1&
 nohup /home/ap/ccb/FastSyncClient/FastSyncDir -p / -t 0 -c 4 >/dev/null 2>&1&
 
+crontab -e
+@reboot /home/ap/webapp/FastSync/.sh
+
 
 
 nohup inotifywait -mrq --timefmt '%d/%m/%y/%H:%M' --format '%T %w %f' -e modify,delete,create,attrib /home/ccb  > inotifywait.log 2>&1 &
