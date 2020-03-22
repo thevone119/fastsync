@@ -106,7 +106,7 @@ func (c *ClientUpManager) SyncFile(lp string, cktype comm.CheckFileType,resend b
 	}
 
 	if ul.Flen<=0{
-		zlog.Error("空文件:", lp)
+		zlog.Error("空文件,不同步:", lp)
 		ul.Close()
 		return
 	}

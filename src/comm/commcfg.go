@@ -53,7 +53,7 @@ func (g *CommConfig) Reload() {
 
 	//Logger 设置
 	if g.LogFile != "" {
-		zlog.SetLogFile(g.LogDir, g.LogFile)
+		zlog.SetLogFile(filepath.Join(CURR_RUN_PATH,"syslog"), g.LogFile)
 	}
 	if g.LogDebugClose == true {
 		zlog.CloseDebug()
@@ -67,7 +67,7 @@ func init() {
 	//初始化GlobalObject变量，设置一些默认值
 	CommConfigObj = &CommConfig{
 		ConfFilePath:     "conf/comm.json",
-		LogDir:           "./syslog",
+		LogDir:           "syslog",
 		LogFile:          "",
 		LogDebugClose:    false,
 	}

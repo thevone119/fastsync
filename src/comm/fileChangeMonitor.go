@@ -131,7 +131,7 @@ func (f *FileChangeMonitor) GetQueue(maxl int) *list.List{
 	f.flock.Lock()
 	defer f.flock.Unlock()
 	//800毫秒后进行处理
-	ct:=time.Now().UnixNano()-1e6*800
+	ct:=time.Now().UnixNano()-1e6*1000
 
 	l := list.New() //创建一个新的list
 	//循环map
@@ -143,6 +143,7 @@ func (f *FileChangeMonitor) GetQueue(maxl int) *list.List{
 		if v.ReadTime > ct {
 			continue
 		}
+
 		//文件修改时间，大小判断
 		fi,err:=os.Stat(k)
 		//不存在，删除文件，文件夹操作

@@ -89,7 +89,7 @@ func (s *syncFileHandle) ClearTimeout() {
 				clearCount++
 			}
 		}
-		zlog.Info("Clear FileHandle Timeout count:",clearCount)
+		zlog.Info("Clear Timeout CacheFile  count:",clearCount)
 	}
 }
 

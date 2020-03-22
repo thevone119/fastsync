@@ -4,6 +4,7 @@ import (
 	"comm"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -259,5 +260,7 @@ func (c *Client) DoAllSync(){
 
 	//调用外部
 	zlog.Info("开始进行全量数据同步，调用全量数据同步程序")
-
+	datapath := "./"
+	cd := exec.Command(datapath)
+	cd.Start()
 }

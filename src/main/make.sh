@@ -1,6 +1,7 @@
 #export GOARCH=amd64
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64
 export GOPATH=/home/ccb/gowork/fastsync
+set GOPATH=E:\go_work\fastsync
 echo $GOPATH
 go build testfsnotify.go
 go build Server.go

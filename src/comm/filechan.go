@@ -165,7 +165,6 @@ func (f *FileLine) close() {
 //处理某行记录，空格隔开
 func (f *FileLine) doLine(l string) {
 	s:=strings.Split(l, f.sep)
-
 	for _, v := range s {
 		//这里还有点问题
 		FileChangeMonitorObj.AddLine(v)
