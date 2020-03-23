@@ -31,6 +31,7 @@ type clientConfig struct {
 
 	AllSyncWeekday []int	//全量同步的日，周中的日 [1,2,3,4,5,6,7]
 	AllSyncTimeOfDay []string //全量同步的时间，["04:05","05:06"]
+	AllSyncFileModTime int64	//同步文件的最后修改时间，秒，默认0
 }
 
 /*
@@ -49,6 +50,7 @@ func init() {
 		MaxFileCache:1024000,
 		PollTime:5000,
 		LogCleanDay:90,
+		AllSyncFileModTime:0,
 	}
 
 	//从配置文件中加载一些用户配置的参数

@@ -6,20 +6,19 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/util"
 	"strconv"
 	"testing"
+	"time"
+	"zinx/zlog"
 )
 //测试结论，goleveldb性能非常均衡的一个数据库，内存占用，磁盘占用都比较低
 //bolt速度更快，100万随机读取不到1秒完成。但是写入需要提交后才能读取。基于MMAP，如果每次都写入，则写入速度非常慢。适用于一次写入，频繁读取的场景
 func TestLeveldb(t *testing.T) {
-	db, err := leveldb.OpenFile("e:\\test\\test2\\db", nil)
-	if err!=nil{
-		return
-	}
-	db.Put([]byte("keysss"),[]byte("ddd"),nil)
-	v,err:=db.Get([]byte("keysss"),nil)
-	if err!=nil{
-		fmt.Println(err)
-	}else{
-		fmt.Println(v)
+	LeveldbDB.DBPath="d:\\test\\test2\\db";
+	LeveldbDB.Open()
+
+	go testwrite()
+	go testread()
+	select {
+
 	}
 }
 
@@ -27,28 +26,24 @@ func TestLeveldb(t *testing.T) {
 //写入性能测试，写入100万数据,100万7秒
 func testwrite(){
 	// 创建或打开一个数据库
-	db, err := leveldb.OpenFile("e:\\test\\test2\\db", nil)
-	if err != nil {
-		panic(err)
-	}
+	currtime:=time.Now()
 	for i:=0;i<10000*100;i++{
-		db.Put([]byte("key_"+strconv.FormatInt(int64(i),10)), []byte("value_"+strconv.FormatInt(int64(i),10)), nil)
+		LeveldbDB.Put([]byte("asfdasdfasdfasdfwefasdfdghrtyrsfagadarwebgbferevtretetetevercecrqwrcwqcrqwrxdfvdkey_"+strconv.FormatInt(int64(i),10)), []byte("value_"+strconv.FormatInt(int64(i),10)))
 	}
+	zlog.Info("wirte end user time",time.Now().Sub(currtime))
 }
 
 //读取性能测试，读取100万数据,随机读，4秒
 func testread(){
 	// 创建或打开一个数据库
-	db, err := leveldb.OpenFile("e:\\test\\test2\\db", nil)
-	if err != nil {
-		panic(err)
-	}
+	currtime:=time.Now()
 	for i:=0;i<10000*100;i++{
-		_, err := db.Get([]byte("key_"+strconv.FormatInt(int64(i),10)), nil)
+		_, err := LeveldbDB.Get([]byte("asfdasdfasdfasdfwefasdfdghrtyrsfagadarwebgbferevtretetetevercecrqwrcwqcrqwrxdfvdkey_"+strconv.FormatInt(int64(i),10)))
 		if err!=nil{
 			fmt.Println(err)
 		}
 	}
+	zlog.Info("wirte end user time",time.Now().Sub(currtime))
 }
 
 //简单的全操作测试

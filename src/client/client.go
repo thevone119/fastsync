@@ -4,7 +4,6 @@ import (
 	"comm"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -48,6 +47,10 @@ func (c *Client) Start() {
 		if !comm.ClientConfigObj.IsLocalPath(v){
 			continue
 		}
+		fi,err:=os.Stat(v)
+		if err!=nil || fi==nil||!fi.IsDir(){
+			continue
+		}
 		fs := comm.NewFSWatch(v)
 		fs.Start()
 	}
@@ -66,7 +69,9 @@ func (c *Client) Start() {
 
 	//轮训监控
 	if len(comm.ClientConfigObj.PollMonitor)>0{
-		f := comm.NewPollWatch(comm.ClientConfigObj.PollMonitor )
+
+		f := comm.NewPollWatch(comm.ClientConfigObj.PollMonitor)
+
 		f.Start()
 	}
 
@@ -175,7 +180,7 @@ func (c *Client) DoFileChange(){
 		if strings.Index(e.Value.(string),"del_")==0{
 			c.client.DeleteFile(e.Value.(string)[4:])
 		}else{
-			c.client.SyncFile(e.Value.(string),comm.FCHECK_FULLMD5_CHECK,true)
+			c.client.SyncFile(e.Value.(string),comm.FCHECK_FULLMD5_CHECK,true,0)
 		}
 		//fmt.Print(e.Value) //输出list的值,01234
 	}
@@ -259,8 +264,8 @@ func (c *Client) DoAllSync(){
 	c.NextAllSyncTime=c.CurrUnixTime+70
 
 	//调用外部
-	zlog.Info("开始进行全量数据同步，调用全量数据同步程序")
-	datapath := "./"
-	cd := exec.Command(datapath)
-	cd.Start()
+	zlog.Info("开始进行全量数据")
+	//开一个携程进行全量同步哦
+	go c.client.SyncPath(comm.ClientConfigObj.AllSyncFileModTime,comm.BASE_PATH,comm.FCHECK_SIZE_AND_TIME_CHECK)
+
 }

@@ -6,8 +6,10 @@ import (
 	"crypto/md5"
 	"encoding/binary"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 	"utils"
@@ -71,15 +73,15 @@ func (s *syncFileHandle) CloseAll(cid uint32) {
 	}
 }
 
-//定时清理，每3分钟清理一次哦，超过3分钟没有操作的文件，则关闭文件
+//定时清理，每2分钟清理一次哦，超过2分钟没有操作的文件，则关闭文件
 func (s *syncFileHandle) ClearTimeout() {
 	ct := time.Now().Unix()
 	if ct > s.nextClearTime {
-		s.nextClearTime = ct + 60*3
+		s.nextClearTime = ct + 60*2
 		//清理
 		s.flock.Lock()
 		defer s.flock.Unlock()
-		clearTime := ct - 60*3
+		clearTime := ct - 60*2
 		clearCount:=0
 		for k, v := range s.fmap {
 			if v.LastTime < clearTime {
@@ -89,6 +91,25 @@ func (s *syncFileHandle) ClearTimeout() {
 				clearCount++
 			}
 		}
+
+		//遍历temp目录，对其文件进行清理,超过24小时的临时文件
+		files, err := ioutil.ReadDir(comm.TEMP_PATH)
+		if err==nil{
+			for _, onefile := range files {
+				if (onefile.IsDir()) {
+					continue
+				}
+				m, _ := filepath.Match("*.temp", onefile.Name())
+				if !m {
+					continue
+				}
+				if time.Now().Sub(onefile.ModTime())>time.Hour*24{
+					os.Remove(comm.TEMP_PATH+"/"+onefile.Name())
+				}
+			}
+		}
+
+
 		zlog.Info("Clear Timeout CacheFile  count:",clearCount)
 	}
 }
@@ -111,6 +132,7 @@ type SyncFile struct {
 	Flen         int64              //文件大小
 	FlastModTime int64              //文件的最后修改时间
 	CheckMd5     []byte             //文件校验的MD5
+	TempFile 	 int64				//临时文件名
 	//
 	WriteLen int64        //已写入文件的长度，当写入文件长度等于文件长度时，写入完整
 	flock    sync.RWMutex //读写锁
@@ -133,6 +155,7 @@ func NewSyncFile(cid uint32, reqid uint32, fp string, flen int64, flastmodtime i
 		FOpen:        false,
 		CheckRet:     0,
 		LastTime:     time.Now().Unix(),
+		TempFile:	  time.Now().UnixNano(),
 	}
 	f.FileAPath,_=filepath.Abs(f.FileAPath)
 	f.init()
@@ -244,7 +267,7 @@ func (this *SyncFile) Open() error {
 	os.MkdirAll(filepath.Dir(this.FileAPath), 0755)
 	//针对已存在的文件，则是打开文件，设置大小为0，并指针指向开头
 	//不存在的文件，则创建文件
-	fw, err := os.Create(this.FileAPath)
+	fw, err := os.Create(filepath.Join(comm.TEMP_PATH,strconv.FormatInt(this.TempFile,10)+".temp"))
 	if err != nil {
 		this.FOpen = false
 		return err
@@ -284,7 +307,20 @@ func (this *SyncFile) Write(sf *comm.SendFileMsg) byte {
 func (this *SyncFile) Close() {
 	this.FOpen = false
 	if this.FH != nil {
-		this.FH.Close()
-		this.FH = nil
+		defer  func() {
+			this.FH.Close()
+			this.FH = nil
+			os.Remove(filepath.Join(comm.TEMP_PATH,strconv.FormatInt(this.TempFile,10)+".temp"))
+		}()
+		this.FH.Seek(0, io.SeekStart)
+		//数据完整了，则拷贝文件到正式那边
+		if this.WriteLen >= this.Flen {
+			dst, err := os.OpenFile(this.FileAPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+			if err != nil {
+				return
+			}
+			defer dst.Close()
+			io.Copy(dst, this.FH)
+		}
 	}
 }

@@ -74,14 +74,14 @@ func (c *ClientUpManager) SyncPath(ltime int64, lp string, filecheck comm.CheckF
 		if (currtime-info.ModTime().Unix())<2{
 			return nil
 		}
-		c.SyncFile(path, filecheck,false)
+		c.SyncFile(path, filecheck,false,info.ModTime().Unix())
 		return nil
 	})
 }
 
 //同步某个文件到服务器,本机文件新增，修改的时候，就调用这个方法
 //cktype:文件的校验类型 //0:不校验  1:size校验 2:fastmd5  3:fullmd5 4
-func (c *ClientUpManager) SyncFile(lp string, cktype comm.CheckFileType,resend bool) {
+func (c *ClientUpManager) SyncFile(lp string, cktype comm.CheckFileType,resend bool,checkmod int64) {
 	//错误拦截,针对上传过程中遇到的错误进行拦截，避免出现意外错误，程序退出
 	defer func() {
 		//恢复程序的控制权
@@ -105,8 +105,14 @@ func (c *ClientUpManager) SyncFile(lp string, cktype comm.CheckFileType,resend b
 		ul.ReSendCount=100
 	}
 
+	//空文件一样要同步哦
 	if ul.Flen<=0{
-		zlog.Error("空文件,不同步:", lp)
+		//zlog.Error("空文件,不同步:", lp)
+		//ul.Close()
+		//return
+	}
+	if checkmod>0 && checkmod!=ul.FlastModTime{
+		zlog.Error("文件正在更改中，不进行同步", lp)
 		ul.Close()
 		return
 	}

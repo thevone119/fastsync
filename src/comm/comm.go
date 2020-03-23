@@ -32,6 +32,7 @@ var NOTIFY_PATH = "notifylog"	//日志监控目录，没有则自动创建
 var TRANSFER_PATH = "transferlog"	//传输日志，没有则自动创建
 
 var WAIT_UP_PATH = "waituplog"			//等待上传的记录在这里，临时记录，上传完清空
+var TEMP_PATH = "temp"			//等待上传的记录在这里，临时记录，上传完清空
 var BASE_PATH=""			//基础的监控路径/home/nas/static
 
 /*
@@ -51,8 +52,9 @@ func init() {
 		NOTIFY_PATH = filepath.Join(CURR_RUN_PATH,"notifylog")
 		TRANSFER_PATH = filepath.Join(CURR_RUN_PATH,"transferlog")
 		WAIT_UP_PATH= filepath.Join(CURR_RUN_PATH,"waituplog")
-
-		//os.MkdirAll(NOTIFY_PATH,0755)
+		TEMP_PATH = filepath.Join(CURR_RUN_PATH,"temp")
+		//创建部分目录
+		os.MkdirAll(TEMP_PATH,0755)
 	}
 
 }

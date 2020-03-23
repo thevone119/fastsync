@@ -77,21 +77,31 @@ func (f *FileChan) goHandle2(){
 			}
 			//获取文件
 			fl := NewFileLine(p," ")
-			if fl.FlastRedTime > info.ModTime().UnixNano() {
-				return nil
+			//这里重新获取一次文件信息，通过路径获取的文件信息可能存在偏差
+			if fl.ReadLineLast<10000{
+				fi,err:=os.Stat(p)
+				if err==nil && fi!=nil{
+					if fl.FlastRedTime > info.ModTime().UnixNano() && fl.FlastRedTime>fi.ModTime().UnixNano()  {
+						return nil
+					}
+				}else{
+					if fl.FlastRedTime > info.ModTime().UnixNano()   {
+						return nil
+					}
+				}
 			}
 			fl.FlastRedTime = time.Now().UnixNano()
-			err = fl.ReadLines(1000)
+			fl.ReadLines(10000)
 			return err
 		})
 	}else{
 		//获取文件
 		fl := NewFileLine(f.dir," ")
-		if fl.FlastRedTime > fi.ModTime().UnixNano() {
+		if fl.ReadLineLast<10000 && fl.FlastRedTime > fi.ModTime().UnixNano() {
 			return
 		}
 		fl.FlastRedTime = time.Now().UnixNano()
-		fl.ReadLines(1000)
+		fl.ReadLines(10000)
 	}
 }
 
@@ -113,6 +123,7 @@ type FileLine struct {
 	filestart    int64    //当前文件位置，这个保存到数据库中的。
 	FH           *os.File //本机文件指针,只读方式打开
 	sep 		 string
+	ReadLineLast int		//最后一次读到了多少行
 }
 
 func NewFileLine(fp string,sep string) *FileLine {
@@ -126,6 +137,7 @@ func NewFileLine(fp string,sep string) *FileLine {
 		filestart:    0,
 		FlastModTime: 0,
 		sep:sep,
+		ReadLineLast:0,
 	}
 
 	s,err:=LeveldbDB.GetInt64([]byte("FL_"+fp))
@@ -194,9 +206,9 @@ func (f *FileLine) ReadLines(mxline int) (error) {
 		return  err
 	}
 	bf:=bufio.NewReader(f.FH)
-	recount:=0
+	f.ReadLineLast=0
 	for {
-		if recount>mxline{
+		if f.ReadLineLast>=mxline{
 			break
 		}
 		l, err := bf.ReadString('\n')
@@ -206,10 +218,10 @@ func (f *FileLine) ReadLines(mxline int) (error) {
 		l=strings.TrimRight(l, "\n")
 		l=strings.TrimSpace(l)
 		f.doLine(l)
-		recount++
+		f.ReadLineLast++
 	}
 	//一行都没读到，则直接返回
-	if recount==0{
+	if f.ReadLineLast==0{
 		return nil
 	}
 	sk, _ = f.FH.Seek(0, io.SeekCurrent)

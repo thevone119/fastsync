@@ -37,6 +37,9 @@ type FileChangeMonitor struct {
 
 //添加某行记录，这行记录中记录这路径等信息
 func (f *FileChangeMonitor) AddLine(l string){
+	if len(l)<len(f.basepath){
+		return
+	}
 	//判断路径中是否存在根路径，如果不存在，则直接过滤掉
 	l=strings.Replace(l,"\\","/",-1)
 

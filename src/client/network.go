@@ -55,6 +55,7 @@ type NetWork struct {
 
 //一个新的网络
 func NewNetWork(id int,ip string, port int, username string, password string,name string) *NetWork {
+	currtime:=time.Now().Unix()
 	n := NetWork{
 		Id:id,
 		Name :			name,
@@ -67,9 +68,10 @@ func NewNetWork(id int,ip string, port int, username string, password string,nam
 		ExitBuffChan:    make(chan bool, 1),
 		sendMsgs:        make(chan ziface.IMessage, 10), //缓存10个数据包 每个4K算的话，就是40K缓存
 		receive:         make(chan ziface.IMessage, 10),
-		TimeOutTime:     0,
-		TimeConnected:   0,
-		ActivityTime:    0,
+		TimeOutTime:     currtime,
+		TimeConnected:   currtime,
+		ActivityTime:    currtime,
+		CurrTime:			currtime,
 		Conn:            nil,
 		dataPack:        znet.NewDataPack(),
 		receiveCallBack: make(map[uint32]func(ziface.IMessage)),
@@ -249,6 +251,7 @@ func (n *NetWork) IsActivity() bool {
 	if !n.Connected {
 		return false
 	}
+
 	if n.ActivityTime+10 <= n.CurrTime {
 		return false
 	}

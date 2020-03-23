@@ -103,7 +103,7 @@ func  (s *localFileHandle) UpLoadEndOne(lf *LocalFile){
 	if scount+ecount>=len(lf.RetCodes){
 		s.SuccUpLoadCount += int64(scount)
 		s.ErrUpLoadCount += int64(ecount)
-		zlog.Debug("Sync end",lf.LPath)
+		zlog.Debug("Sync end",lf.LPath,lf.RetCodes)
 		lf.Close()
 		delete(s.fmap, lf.Lid)
 		//如果存在错误的，则在这里把错误记录到重发列表

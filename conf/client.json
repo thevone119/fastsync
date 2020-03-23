@@ -1,5 +1,5 @@
 {
-  "LocalPath":"e:/project/test2",
+  "LocalPath":"e:/test",
   "NotifyMonitor": ["e:/project/test2"],
   "PollMonitor": ["e:/project2222"],
   "PollTime": 5000,
@@ -12,5 +12,6 @@
   "LogCleanDay": 90,
   "RemotePath":["easysite|easysite12#$|111.229.241.157:8999/","easysite|easysite12#$|127.0.0.1:8999/"],
   "AllSyncWeekday": [0,1,2,3,4,5,6],
-  "AllSyncTimeOfDay": ["07:13","05:06"]
+  "AllSyncTimeOfDay": ["04:10","06:10"],
+  "AllSyncFileModTime": 0
 }

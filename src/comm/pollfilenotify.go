@@ -62,6 +62,9 @@ func (f *PollWatch) goHandle2(){
 		return
 	}
 	for _, fp := range f.basepath {
+		if !ClientConfigObj.IsLocalPath(fp){
+			continue
+		}
 		fi,err:=os.Stat(fp)
 		if err!=nil{
 			continue

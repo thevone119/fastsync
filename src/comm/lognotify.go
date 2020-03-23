@@ -72,19 +72,20 @@ func (f *LogWatch) goHandle2(){
 				fl := NewFileLine(fps+"/"+onefile.Name(),f.sep)
 
 				//这里重新获取一次文件信息，通过路径获取的文件信息可能存在偏差
-				fi,err:=os.Stat(fps+"/"+onefile.Name())
-				if err==nil && fi!=nil{
-					if fl.FlastRedTime > onefile.ModTime().UnixNano() && fl.FlastRedTime>fi.ModTime().UnixNano()  {
-						continue
-					}
-				}else{
-					if fl.FlastRedTime > onefile.ModTime().UnixNano()   {
-						continue
+				if fl.ReadLineLast<10000{
+					fi,err:=os.Stat(fps+"/"+onefile.Name())
+					if err==nil && fi!=nil{
+						if fl.FlastRedTime > onefile.ModTime().UnixNano() && fl.FlastRedTime>fi.ModTime().UnixNano()  {
+							continue
+						}
+					}else{
+						if fl.FlastRedTime > onefile.ModTime().UnixNano()   {
+							continue
+						}
 					}
 				}
-
 				fl.FlastRedTime = time.Now().UnixNano()
-				fl.ReadLines(1000)
+				fl.ReadLines(10000)
 			}
 		}
 		return
@@ -94,11 +95,11 @@ func (f *LogWatch) goHandle2(){
 	}else{
 		//获取文件
 		fl := NewFileLine(f.basepath,f.sep)
-		if fl.FlastRedTime > fi.ModTime().UnixNano() {
+		if fl.ReadLineLast<10000 && fl.FlastRedTime > fi.ModTime().UnixNano() {
 			return
 		}
 		fl.FlastRedTime = time.Now().UnixNano()
-		fl.ReadLines(1000)
+		fl.ReadLines(10000)
 	}
 }
 

@@ -161,6 +161,7 @@ func (this *SendFileReqRouter) Handle(request ziface.IRequest) {
 		request.GetConnection().SendBuffMsg(comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 3).GetMsg())
 		return
 	}
+
 	//文件校验结果  0：有相同文件，无需上传 1：文件读取错误，无需上传 2：无文件，需要上传 3：文件校验不同，需要上传 4：无校验，直接上传
 	switch syncf.CheckRet {
 	case 0: //0：有相同文件，无需上传
@@ -175,16 +176,40 @@ func (this *SendFileReqRouter) Handle(request ziface.IRequest) {
 		return
 	case 2:
 		zlog.Debug("file not found", freq.Filepath)
+		//针对空文件
+		if syncf.Flen==0{
+			syncf.Open()
+			syncf.Close()
+			SyncFileHandle.RemoveSyncFile(syncf)
+			request.GetConnection().SendBuffMsg(comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 2).GetMsg())
+			return
+		}
 		syncf.Open()
 		request.GetConnection().SendBuffMsg(comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 0).GetMsg())
 		return
 	case 3:
 		zlog.Debug("check file is different", freq.Filepath)
+		//针对空文件
+		if syncf.Flen==0{
+			syncf.Open()
+			syncf.Close()
+			SyncFileHandle.RemoveSyncFile(syncf)
+			request.GetConnection().SendBuffMsg(comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 2).GetMsg())
+			return
+		}
 		syncf.Open()
 		request.GetConnection().SendBuffMsg(comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 0).GetMsg())
 		return
 	case 4:
 		zlog.Debug("file not check,upload", freq.Filepath)
+		//针对空文件
+		if syncf.Flen==0{
+			syncf.Open()
+			syncf.Close()
+			SyncFileHandle.RemoveSyncFile(syncf)
+			request.GetConnection().SendBuffMsg(comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 2).GetMsg())
+			return
+		}
 		syncf.Open()
 		request.GetConnection().SendBuffMsg(comm.NewSendFileReqRetMsg(freq.ReqId, syncf.FileId, 0).GetMsg())
 		return

@@ -75,6 +75,12 @@ func (w *FSWatch) openLog(){
 
 
 func (w *FSWatch) Start() {
+	fi,err:=os.Stat(w.basepath)
+
+	if err!=nil || fi==nil ||!fi.IsDir(){
+		zlog.Error("监控服务开启失败", err)
+		return
+	}
 	wer, err := fsnotify.NewWatcher()
 	if err != nil {
 		zlog.Error("监控服务开启失败", err)
