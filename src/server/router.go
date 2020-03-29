@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"time"
 	"utils"
 	"zinx/ziface"
 	"zinx/zlog"
@@ -26,8 +25,9 @@ type KeepAliveRouter struct {
 //Ping Handle
 func (this *KeepAliveRouter) Handle(request ziface.IRequest) {
 	zlog.Debug("KeepAlive...", request.GetConnection().RemoteAddr())
+	km := comm.NewKeepAliveMsgByByte(request.GetData())
 	//
-	err := request.GetConnection().SendBuffMsg(comm.NewKeepAliveMsg(time.Now().Unix()).GetMsg())
+	err := request.GetConnection().SendBuffMsg(comm.NewKeepAliveMsg(km.CTime).GetMsg())
 	if err != nil {
 		zlog.Error(err)
 	}

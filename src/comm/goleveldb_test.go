@@ -15,11 +15,8 @@ func TestLeveldb(t *testing.T) {
 	LeveldbDB.DBPath="d:\\test\\test2\\db";
 	LeveldbDB.Open()
 
-	go testwrite()
-	go testread()
-	select {
+	 testwrite()
 
-	}
 }
 
 
@@ -27,9 +24,11 @@ func TestLeveldb(t *testing.T) {
 func testwrite(){
 	// 创建或打开一个数据库
 	currtime:=time.Now()
-	for i:=0;i<10000*100;i++{
+	for i:=0;i<100;i++{
 		LeveldbDB.Put([]byte("asfdasdfasdfasdfwefasdfdghrtyrsfagadarwebgbferevtretetetevercecrqwrcwqcrqwrxdfvdkey_"+strconv.FormatInt(int64(i),10)), []byte("value_"+strconv.FormatInt(int64(i),10)))
 	}
+	LeveldbDB.Close()
+
 	zlog.Info("wirte end user time",time.Now().Sub(currtime))
 }
 

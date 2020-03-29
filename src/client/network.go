@@ -28,12 +28,23 @@ type NetWork struct {
 	PassWord  string
 	Connected bool
 
+	//ping time
+
 	//告知该链接已经退出/停止的channel
 	ExitBuffChan chan bool
 	sendMsgs     chan ziface.IMessage //发送消息管道 1024
 	receive      chan ziface.IMessage //接受到消息的管道 1024
 	//当前连接的socket TCP套接字
 	Conn          net.Conn
+	//统计信息
+	ConnCount      int64	//连接次数，掉线重新连次数
+	SuccConnCount	int64	//成功连接次数
+	PingTime      int64	//ping的时长，毫秒
+	MaxPingTime	  int64	//最大的ping值
+	OnlineTime	  int64	//在线时长，秒
+	OfflineTime   int64 //离线时长，秒
+
+	//逻辑处理
 	TimeOutTime   int64
 	TimeConnected int64
 	ActivityTime  int64 //活动时间，存活时间，如果超过5秒没有活动了。则认为这个连接有问题了哦
@@ -99,7 +110,7 @@ func (n *NetWork) connect() {
 	n.TimeOutTime = n.TimeConnected
 	adder := fmt.Sprintf("%s:%d", n.IP, n.Port)
 	zlog.Debug("connect to:", adder)
-
+	n.ConnCount++
 	conn, err := net.DialTimeout("tcp", adder, time.Duration(3)*time.Second)
 	if err != nil {
 		zlog.Error("NetWork Connect err!", adder)
@@ -114,7 +125,7 @@ func (n *NetWork) connect() {
 	n.ActivityTime = n.TimeConnected
 	//登录认证
 	n.SendData(comm.NewLoginMsg(n.UserName, n.PassWord).GetMsg())
-
+	n.SuccConnCount++
 
 	//开启读写线程
 	go n.receiveData()
@@ -142,6 +153,11 @@ func (n *NetWork) process() {
 	for {
 		select {
 		case <-ticker.C:
+			if n.Connected{
+				n.OnlineTime++
+			}else{
+				n.OfflineTime++
+			}
 			n.CurrTime = time.Now().Unix()
 			//超过5秒没有连接上，则再次发起连接？
 			if !n.Connected && n.CurrTime > n.TimeConnected+5 {
@@ -153,7 +169,7 @@ func (n *NetWork) process() {
 			//超时发送心跳包？每10秒发送一个？心跳包是空的？
 			if n.Connected && n.CurrTime > n.TimeOutTime {
 				n.TimeOutTime = n.CurrTime + 5
-				n.Enqueue(comm.NewKeepAliveMsg(n.CurrTime).GetMsg())
+				n.Enqueue(comm.NewKeepAliveMsg(time.Now().UnixNano()/ 1e6).GetMsg())
 			}
 		}
 	}
@@ -268,6 +284,12 @@ func (n *NetWork) RemoveCallBack(msgid uint32, cb func(ziface.IMessage)) {
 
 func (n *NetWork) doKeepalive(msg ziface.IMessage) {
 	//zlog.Debug("Receive keepalive back")
+	//计算ping值
+	ret := comm.NewKeepAliveMsgByByte(msg.GetData())
+	n.PingTime=(time.Now().UnixNano()/1e6)-ret.CTime
+	if n.PingTime>n.MaxPingTime{
+		n.MaxPingTime=n.PingTime
+	}
 }
 
 func (n *NetWork) doResponse(msg ziface.IMessage) {

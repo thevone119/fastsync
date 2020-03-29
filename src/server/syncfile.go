@@ -298,13 +298,18 @@ func (this *SyncFile) Write(sf *comm.SendFileMsg) byte {
 	}
 	this.WriteLen += int64(rn)
 	if this.WriteLen >= this.Flen {
+		err=this.Close()
+		if err!=nil{
+			return 2
+		}
 		return 3
 	}
 	return 1
 }
 
 //关闭文件句柄
-func (this *SyncFile) Close() {
+func (this *SyncFile) Close() error {
+	//defer后进先出原则
 	this.FOpen = false
 	if this.FH != nil {
 		defer  func() {
@@ -312,15 +317,20 @@ func (this *SyncFile) Close() {
 			this.FH = nil
 			os.Remove(filepath.Join(comm.TEMP_PATH,strconv.FormatInt(this.TempFile,10)+".temp"))
 		}()
-		this.FH.Seek(0, io.SeekStart)
+		_,err:=this.FH.Seek(0, io.SeekStart)
+		if err!=nil{
+			return err
+		}
 		//数据完整了，则拷贝文件到正式那边
 		if this.WriteLen >= this.Flen {
 			dst, err := os.OpenFile(this.FileAPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 			if err != nil {
-				return
+				return err
 			}
 			defer dst.Close()
-			io.Copy(dst, this.FH)
+			_,err=io.Copy(dst, this.FH)
+			return err
 		}
 	}
+	return nil
 }

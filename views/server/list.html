@@ -1,0 +1,88 @@
+<div class="layui-layout layui-layout-admin" style="padding-left: 10px;padding-right: 10px;">
+
+
+    <table class="layui-hide" id="table_list" lay-filter="table_filter">
+    </table>
+
+</div>
+<script>
+
+    layui.use(['table','form','element'], function(){
+        var table = layui.table;
+        var form = layui.form;
+        var element = layui.element;
+
+        //方法级渲染
+        table.render({
+            elem: '#table_list'
+            ,url: '/server/table'
+            ,cols: [[
+                // {checkbox: true, fixed: true},
+                {field:'Name',title: '网络'}
+                ,{field:'SendSpeed', title: '传输速率'}
+                ,{field:'phone', title: '传输文件数'}
+                ,{field:'Connected', title: '在线时长'}
+                ,{field:'PingTime', title: 'ping(ms)'}
+                ,{field:'SuccConnCount', title: '连接次数'}
+            ]]
+            ,id: 'listReload'
+            ,page: false
+            ,height: "full-65"
+        });
+
+        var $ = layui.$, active = {
+            reload: function(){
+                table.reload('listReload', {
+                    where: {
+                        realName: $('#realName').val(),
+                    }
+                });
+            }
+        };
+
+        //监听工具条
+        table.on('tool(table_filter)', function(obj){
+            var data = obj.data;
+            if(obj.event === 'edit'){
+                window.location.href="/admin/edit?id="+data.id
+            } else if(obj.event === 'status'){
+
+                acts = "禁用";
+                status = "disable";
+                if (data.status === 0) {
+                    acts = '启用';
+                    status = "enable";
+                }
+                if (data.id==1 && obj.event === 'disable') {
+                    layer.msg('超级管理员不允许操作');
+                    return false;
+                }
+
+                layer.confirm('真的'+acts+'【'+data.login_name+'】账号么', function(index){
+                    var jsData = {'id':data.id,'status':status}
+                    $.post('{{urlfor "AdminController.AjaxDel"}}', jsData, function (out) {
+                        if (out.status == 0) {
+                            layer.alert(out.message, {icon: 1},function(index){
+                                layer.close(index);
+                                window.location.reload();
+                            });
+                        } else {
+                            layer.msg(out.message)
+                        }
+                    }, "json");
+                    // obj.del();
+                    layer.close(index);
+                })
+
+            }else{
+                layer.msg('操作不存在');
+            }
+        });
+
+        $('.demoTable .layui-btn').on('click', function(){
+            var type = $(this).data('type');
+            active[type] ? active[type].call(this) : '';
+        });
+    });
+
+</script>

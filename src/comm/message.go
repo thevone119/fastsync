@@ -64,19 +64,26 @@ func (m *MessageUtils) ReadString(r io.Reader) string {
 
 //各种数据包定义
 //1.KeepAliveMsg 客户端/服务器包
+//ping 包
 type KeepAliveMsg struct {
-	time int64
+	CTime int64
 }
 
 func NewKeepAliveMsg(t int64) *KeepAliveMsg {
 	return &KeepAliveMsg{
-		time: t,
+		CTime: t,
 	}
+}
+func NewKeepAliveMsgByByte(b []byte) *KeepAliveMsg {
+	bytesBuffer := bytes.NewBuffer(b)
+	km:=KeepAliveMsg{}
+	binary.Read(bytesBuffer, binary.BigEndian, &km.CTime)
+	return &km
 }
 
 func (m *KeepAliveMsg) GetMsg() ziface.IMessage {
 	bytesBuffer := bytes.NewBuffer([]byte{})
-	binary.Write(bytesBuffer, binary.BigEndian, m.time)
+	binary.Write(bytesBuffer, binary.BigEndian, m.CTime)
 	return znet.NewMsgPackage(MID_KeepAlive, bytesBuffer.Bytes())
 }
 

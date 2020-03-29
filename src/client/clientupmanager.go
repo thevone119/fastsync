@@ -51,6 +51,7 @@ func srtToFileUpload(id int,str string) *FileUpload {
 	path := strs[2][strings.Index(strs[2], "/"):]
 	c := NewNetWork(id,ip, port, username, pwd,strs[2])
 	fupload := NewFileUpload(c, 20, path)
+	fupload.Name=strs[2]
 	return fupload
 }
 
@@ -214,7 +215,7 @@ func (c *ClientUpManager) MoveFile(srcp string, dstp string) {
 func (c *ClientUpManager) Close() {
 	//装置客户端上传类
 	for _, fu := range c.RemoteUpLoad {
-		fu.netclient.Disconnect()
+		fu.Netclient.Disconnect()
 	}
 }
 

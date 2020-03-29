@@ -10,11 +10,13 @@ import (
 	"zinx/zlog"
 )
 
+var ClientObj *Client
+
 //客户端引擎
 //1.实现客户端无限循环处理(200毫秒轮询)，这个其他类的一些需要定时循环处理的都加到这里
 //2.其他组件，寻捆绑到这个客户端组件上，实现组件间的交互处理
 type Client struct {
-	client *ClientUpManager
+	Client *ClientUpManager
 	NextClearTime int64	//下次清理日志的时间
 	CurrUnixTime int64		//当前时间，秒
 	NextAllSyncTime  int64	//下次全量同步时间，每分钟校验一次
@@ -38,7 +40,7 @@ func (c *Client) Start() {
 	//打开数据库
 	comm.LeveldbDB.Open()
 	//开启一个客户端监听处理
-	c.client = NewClientUpManager()
+	c.Client = NewClientUpManager()
 	//睡眠1秒等待网络连接
 	time.Sleep(1 * time.Second)
 
@@ -74,9 +76,6 @@ func (c *Client) Start() {
 
 		f.Start()
 	}
-
-
-
 
 
 	//开启线程轮询
@@ -170,7 +169,7 @@ func (c *Client) DoUpload(){
 func (c *Client) DoReSendFile(){
 	l:=LocalFileHandle.GetReSend()
 	for e := l.Front(); e != nil; e = e.Next() {
-		c.client.ReSyncFile(e.Value.(*LocalFile))
+		c.Client.ReSyncFile(e.Value.(*LocalFile))
 	}
 }
 
@@ -178,9 +177,9 @@ func (c *Client) DoFileChange(){
 	l:=comm.FileChangeMonitorObj.GetQueue(200)
 	for e := l.Front(); e != nil; e = e.Next() {
 		if strings.Index(e.Value.(string),"del_")==0{
-			c.client.DeleteFile(e.Value.(string)[4:])
+			c.Client.DeleteFile(e.Value.(string)[4:])
 		}else{
-			c.client.SyncFile(e.Value.(string),comm.FCHECK_FULLMD5_CHECK,true,0)
+			c.Client.SyncFile(e.Value.(string),comm.FCHECK_FULLMD5_CHECK,true,0)
 		}
 		//fmt.Print(e.Value) //输出list的值,01234
 	}
@@ -195,6 +194,7 @@ func (c *Client) DoClearLog(){
 			zlog.Error("DoClearLog 处理错误", p)
 		}
 	}()
+
 	if c.CurrUnixTime<c.NextClearTime{
 		return
 	}
@@ -266,6 +266,6 @@ func (c *Client) DoAllSync(){
 	//调用外部
 	zlog.Info("开始进行全量数据")
 	//开一个携程进行全量同步哦
-	go c.client.SyncPath(comm.ClientConfigObj.AllSyncFileModTime,comm.BASE_PATH,comm.FCHECK_SIZE_AND_TIME_CHECK)
+	go c.Client.SyncPath(comm.ClientConfigObj.AllSyncFileModTime,comm.BASE_PATH,comm.FCHECK_SIZE_AND_TIME_CHECK)
 
 }

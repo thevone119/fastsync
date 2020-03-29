@@ -13,9 +13,9 @@ import (
 //文件上传类
 //每个远程链接对应一个这样的类，保持长链接的文件传输处理
 //记录上传结果，有上传完成事件
-
 type FileUpload struct {
-	netclient *NetWork //网络连接类，保持长连接
+	Name string
+	Netclient *NetWork //网络连接类，保持长连接
 	timeout   int64    //超时时间，秒
 	RPath     string   //远端服务器的路径
 
@@ -30,18 +30,28 @@ type FileUpload struct {
 	sendFileState byte   //文件上传的状态记录 0:未开始 1：正在上传  2： 上传完成 3：上传错误
 	sendFilePath  string //正在传送的文件名称记录
 
+	SendSpeed	int64	//当前传输速率，每秒XXbyte,针对
+	MaxSendSpeed	int64	//最大传输速率，每秒XXbyte,针对
+	MinSendSpeed	int64	//最小传输速率，每秒XXbyte,针对
+
+	SuccSendCount	int64//成功发送次数
+	ErrorSendCount	int64//失败发送次数
+
+	IsStopUpload 		bool	//是否停止上传服务,如果停止了，所有服务都停止
+
 	secId uint32
 }
 
 func NewFileUpload(nc *NetWork, to int64, fp string) *FileUpload {
 	n := FileUpload{
-		netclient:          nc,
+		Netclient:          nc,
 		timeout:            to,
 		RPath:              fp,
 		upLoads:            make(chan *LocalFile, 10),
 		sendFileReqRetChan: make(chan *comm.SendFileReqRetMsg, 10),
 		sendFileRetChan:    make(chan *comm.SendFileRetMsg, 10),
 		secId:              0,
+		IsStopUpload:		false,
 	}
 	//注册一些方法哦
 	nc.AddCallBack(comm.MID_SendFileRet, n.doSendFileRet)
@@ -54,6 +64,9 @@ func NewFileUpload(nc *NetWork, to int64, fp string) *FileUpload {
 
 //发送上传
 func (n *FileUpload) SendUpload(l *LocalFile) {
+	if n.IsStopUpload{
+		return
+	}
 	n.upLoads <- l
 }
 
@@ -75,7 +88,7 @@ func (n *FileUpload) goupLoadProcess() {
 
 //异常包裹，出现任何的异常，均返回未知异常
 // 0:上传成功 1：io失败，无法上传，2：文件一致，无需上传 3：服务器读写错误 4：服务器连接异常，5：服务器连接异常，发送数据失败，6：校验文件上传超时，7：文件上传失败，读取文件异常
-//8：文件上中断，9：文件发送超时，10：文件块发送超时，11：服务端文件块写入失败 12:服务器登录认证失败，无法上传 13：文件被其他客户端锁定，无法上传 100：未知异常
+//8：文件上中断，9：文件发送超时，10：文件块发送超时，11：服务端文件块写入失败 12:服务器登录认证失败，无法上传 13：文件被其他客户端锁定，无法上传,14：上传服务停止 100：未知异常
 func (n *FileUpload) doUploadChan(l *LocalFile) (retb byte, err error) {
 	//错误拦截,针对上传过程中遇到的错误进行拦截，避免出现意外错误，程序退出
 	defer func() {
@@ -94,23 +107,28 @@ func (n *FileUpload) doUploadChan(l *LocalFile) (retb byte, err error) {
 	}()
 
 	//如果是重发的，已经成功的不再重发
-	if l.RetCodes[n.netclient.Id]==0||l.RetCodes[n.netclient.Id]==2{
-		return l.RetCodes[n.netclient.Id],nil
+	if l.RetCodes[n.Netclient.Id]==0||l.RetCodes[n.Netclient.Id]==2{
+		return l.RetCodes[n.Netclient.Id],nil
 	}
 
-	l.SUpLoadTime[n.netclient.Id]=time.Now().UnixNano() / 1e6
+	l.SUpLoadTime[n.Netclient.Id]=time.Now().UnixNano() / 1e6
 	retb,err=n.doUploadChan2(l)
 	//返回码记录在这里汇总
-	l.EUpLoadTime[n.netclient.Id]=time.Now().UnixNano() / 1e6
-	l.RetCodes[n.netclient.Id]=retb
+	l.EUpLoadTime[n.Netclient.Id]=time.Now().UnixNano() / 1e6
+	l.RetCodes[n.Netclient.Id]=retb
 	//结束
 	LocalFileHandle.UpLoadEndOne(l)
-
+	//统计成功失败次数
+	if retb==0||retb==2{
+		n.SuccSendCount++
+	}else{
+		n.ErrorSendCount++
+	}
 	return
 }
 
 //管道上传，单线程,校验是否需要上传，如果需要上传再进行第3步的文件上传
-func (n *FileUpload) doUploadChan2(l *LocalFile) (byte, error) {
+func (n *FileUpload) doUploadChan2(l *LocalFile) (rcode byte, rerr error) {
 	if n.secId >= math.MaxUint32 {
 		n.secId = 1
 	}
@@ -118,16 +136,16 @@ func (n *FileUpload) doUploadChan2(l *LocalFile) (byte, error) {
 	_secId := n.secId
 
 	//这里要做个判断，判断客户端是否活动，如果不在活动中，这个直接就失败了。避免某个客户端连接不上，柱塞所有的任务
-	if !n.netclient.IsActivity() {
+	if !n.Netclient.IsActivity() {
 		return 4, errors.New("服务器连接异常")
 	}
 	//判断是否登录了服务器，未登录无法上传
-	if !n.netclient.Login{
+	if !n.Netclient.Login{
 		//return 12, errors.New("服务器登录认证失败，无法上传")
 	}
 
 	//1.同步请求，请求服务器，看是否需要上传，如果需要则上传
-	err := n.netclient.SendData(comm.NewSendFileReqMsg(_secId, l.Flen, l.FlastModTime, l.FileMd5, l.cktype, 1, l.RPath).GetMsg())
+	err := n.Netclient.SendData(comm.NewSendFileReqMsg(_secId, l.Flen, l.FlastModTime, l.FileMd5, l.cktype, 1, l.RPath).GetMsg())
 	if err != nil {
 		return 5, errors.New("服务器连接异常，发送数据失败")
 	}
@@ -144,8 +162,21 @@ func (n *FileUpload) doUploadChan2(l *LocalFile) (byte, error) {
 				}
 				//返回了请求
 				if data.RetCode == 0 {
+					startt:=time.Now()
 					//可以上传，上传文件
-					return n.doUploadChan3(data.RetId, l)
+					rcode,rerr=n.doUploadChan3(data.RetId, l)
+					//计算网速
+					usertime:=time.Now().Sub(startt).Milliseconds()
+					if rcode==0&&usertime>0{
+						n.SendSpeed=l.Flen*1000/usertime
+						if n.SendSpeed>n.MaxSendSpeed{
+							n.MaxSendSpeed = n.SendSpeed
+						}
+						if n.SendSpeed<n.MinSendSpeed||n.MinSendSpeed==0{
+							n.MinSendSpeed=n.SendSpeed
+						}
+					}
+					return
 				}
 				if data.RetCode == 1 {
 					return 1, errors.New("服务端io失败，无法上传")
@@ -185,7 +216,7 @@ func (n *FileUpload) doUploadChan3(fh uint32, l *LocalFile) (byte, error) {
 			break
 		}
 		//发送,这里直接发即可。不用缓存了，因为这个方法本来就已经有缓存
-		err = n.netclient.SendData(comm.NewSendFileMsg(0, fh, start, buff[:rn]).GetMsg())
+		err = n.Netclient.SendData(comm.NewSendFileMsg(0, fh, start, buff[:rn]).GetMsg())
 		if err != nil {
 			return 5, errors.New("服务器连接异常，发送数据失败,发送文件中断")
 		}
@@ -258,16 +289,25 @@ func (n *FileUpload) doSendFileReqRet(msg ziface.IMessage) {
 
 //删除文件，包括文件夹
 func (n *FileUpload) DeleteFile(rp string) {
-	n.netclient.Enqueue(comm.NewDeleteFileRetMsg(0, 0, comm.AppendPath(n.RPath, rp)).GetMsg())
+	if n.IsStopUpload{
+		return
+	}
+	n.Netclient.Enqueue(comm.NewDeleteFileRetMsg(0, 0, comm.AppendPath(n.RPath, rp)).GetMsg())
 }
 
 //复制文件，包括文件夹
 func (n *FileUpload) CopyFile(srcrp string, dstrp string) {
-	n.netclient.Enqueue(comm.NewMoveFileReqMsg(0, 0, comm.AppendPath(n.RPath, srcrp), comm.AppendPath(n.RPath, dstrp)).GetMsg())
+	if n.IsStopUpload{
+		return
+	}
+	n.Netclient.Enqueue(comm.NewMoveFileReqMsg(0, 0, comm.AppendPath(n.RPath, srcrp), comm.AppendPath(n.RPath, dstrp)).GetMsg())
 }
 
 //移动文件 ，包括文件夹
 func (n *FileUpload) MoveFile(srcrp string, dstrp string) {
-	n.netclient.Enqueue(comm.NewMoveFileReqMsg(0, 1, comm.AppendPath(n.RPath, srcrp), comm.AppendPath(n.RPath, dstrp)).GetMsg())
+	if n.IsStopUpload{
+		return
+	}
+	n.Netclient.Enqueue(comm.NewMoveFileReqMsg(0, 1, comm.AppendPath(n.RPath, srcrp), comm.AppendPath(n.RPath, dstrp)).GetMsg())
 }
 
